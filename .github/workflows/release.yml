@@ -29,11 +29,11 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - name: Install dependencies
-        run: npm i
+        run: npm install --no-audit --no-fund
 
       - name: Run semantic-release
         id: release
@@ -65,11 +65,11 @@ jobs:
               "description": f"Version determination failed for **{os.environ['REPO']}**. No release was created.",
               "color":       15158332,
               "fields": [
-                  {"name": "Repository",   "value": f"[{os.environ['REPO']}](https://github.com/{os.environ['REPO']})", "inline": True},
-                  {"name": "Branch",       "value": f"`{os.environ['BRANCH']}`",  "inline": True},
-                  {"name": "Triggered By", "value": f"`{os.environ['ACTOR']}`",   "inline": True},
-                  {"name": "Commit",       "value": f"[`{os.environ['SHA'][:7]}`](https://github.com/{os.environ['REPO']}/commit/{os.environ['SHA']})", "inline": True},
-                  {"name": "Workflow Run", "value": f"[View Logs](https://github.com/{os.environ['REPO']}/actions/runs/{os.environ['RUN_ID']})", "inline": False},
+                  {"name": "Repository",   "value": f"https://github.com/{os.environ['REPO']}", "inline": True},
+                  {"name": "Branch",       "value": os.environ["BRANCH"],  "inline": True},
+                  {"name": "Triggered By", "value": os.environ["ACTOR"],   "inline": True},
+                  {"name": "Commit",       "value": os.environ["SHA"][:7], "inline": True},
+                  {"name": "Workflow Run", "value": f"https://github.com/{os.environ['REPO']}/actions/runs/{os.environ['RUN_ID']}", "inline": False},
               ],
               "footer": {"text": f"{os.environ['WORKFLOW']} | Run #{os.environ['RUN_NUMBER']}"},
           }]}
@@ -89,22 +89,18 @@ jobs:
     if: needs.semantic-release.outputs.new_release_published == 'true'
 
     steps:
-      - name: Checkout release tag
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           ref: ${{ needs.semantic-release.outputs.new_release_git_tag }}
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
-      - name: Install dependencies
-        run: npm ci
+      - run: npm install --no-audit --no-fund
 
-      - name: Build and publish
-        env:
+      - env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: npm run build:win -- --publish always
 
@@ -115,22 +111,18 @@ jobs:
     if: needs.semantic-release.outputs.new_release_published == 'true'
 
     steps:
-      - name: Checkout release tag
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           ref: ${{ needs.semantic-release.outputs.new_release_git_tag }}
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
-      - name: Install dependencies
-        run: npm ci
+      - run: npm install --no-audit --no-fund
 
-      - name: Build and publish
-        env:
+      - env:
           GH_TOKEN:         ${{ secrets.GITHUB_TOKEN }}
           CSC_LINK:         ${{ secrets.MAC_CSC_LINK }}
           CSC_KEY_PASSWORD: ${{ secrets.MAC_CSC_KEY_PASSWORD }}
@@ -143,25 +135,20 @@ jobs:
     if: needs.semantic-release.outputs.new_release_published == 'true'
 
     steps:
-      - name: Checkout release tag
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           ref: ${{ needs.semantic-release.outputs.new_release_git_tag }}
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
-      - name: Install dependencies
-        run: npm ci
+      - run: npm install --no-audit --no-fund
 
-      - name: Install Linux build dependencies
-        run: sudo apt-get update && sudo apt-get install -y libarchive-tools
+      - run: sudo apt-get update && sudo apt-get install -y libarchive-tools
 
-      - name: Build and publish
-        env:
+      - env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: npm run build:linux -- --publish always
 
@@ -172,8 +159,7 @@ jobs:
     if: always() && needs.semantic-release.outputs.new_release_published == 'true'
 
     steps:
-      - name: Post release summary
-        shell: python
+      - shell: python
         env:
           WEBHOOK_URL:  ${{ secrets.DISCORD_WEBHOOK_RELEASES }}
           REPO:         ${{ github.repository }}
@@ -208,22 +194,16 @@ jobs:
 
           payload = {"embeds": [{
               "title":       f"Release {tag} — {label}",
-              "description": (
-                  f"**THEBOIS Overlay** `{ver}` has been published.\n"
-                  f"Installers are attached to the [GitHub Release](https://github.com/{repo}/releases/tag/{tag})."
-              ),
+              "description": f"{ver} has been published. https://github.com/{repo}/releases/tag/{tag}",
               "color": color,
               "fields": [
-                  {"name": "Version",              "value": f"`{ver}`",                "inline": True},
-                  {"name": "Tag",                  "value": f"`{tag}`",                "inline": True},
-                  {"name": "Triggered By",         "value": f"`{os.environ['ACTOR']}`","inline": True},
-                  {"name": "Windows (x64 NSIS)",   "value": badge(win),               "inline": True},
-                  {"name": "macOS (DMG)",           "value": badge(mac),               "inline": True},
-                  {"name": "Linux (AppImage)",      "value": badge(linux),             "inline": True},
-                  {"name": "Release Notes",         "value": f"[View Release](https://github.com/{repo}/releases/tag/{tag})", "inline": False},
-                  {"name": "Workflow Run",          "value": f"[View Logs](https://github.com/{repo}/actions/runs/{os.environ['RUN_ID']})", "inline": False},
+                  {"name": "Version", "value": ver, "inline": True},
+                  {"name": "Tag",     "value": tag, "inline": True},
+                  {"name": "Windows", "value": badge(win), "inline": True},
+                  {"name": "macOS",   "value": badge(mac), "inline": True},
+                  {"name": "Linux",   "value": badge(linux), "inline": True},
+                  {"name": "Logs",    "value": f"https://github.com/{repo}/actions/runs/{os.environ['RUN_ID']}", "inline": False},
               ],
-              "footer": {"text": f"{os.environ['WORKFLOW']} | Run #{os.environ['RUN_NUMBER']}"},
           }]}
 
           req = urllib.request.Request(
