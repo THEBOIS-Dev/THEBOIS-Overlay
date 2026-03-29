@@ -27,7 +27,7 @@ jobs:
           persist-credentials: false
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: 24
           cache: npm
@@ -97,7 +97,7 @@ jobs:
         with:
           ref: ${{ needs.semantic-release.outputs.new_release_git_tag }}
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: 24
           cache: npm
@@ -119,7 +119,7 @@ jobs:
         with:
           ref: ${{ needs.semantic-release.outputs.new_release_git_tag }}
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: 24
           cache: npm
@@ -143,7 +143,7 @@ jobs:
         with:
           ref: ${{ needs.semantic-release.outputs.new_release_git_tag }}
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: 24
           cache: npm
