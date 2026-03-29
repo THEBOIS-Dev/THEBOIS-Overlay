@@ -1,0 +1,95 @@
+name: CI
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+    branches: [main, dev]
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    name: Quality Checks
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Prettier
+        id: prettier
+        run: npm run format:check
+
+      - name: ESLint
+        id: eslint
+        run: npm run lint
+
+      - name: TypeScript
+        id: typecheck
+        run: npm run typecheck
+
+      - name: Notify Discord — failure
+        if: failure()
+        shell: python
+        env:
+          WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_CI }}
+          REPO:        ${{ github.repository }}
+          BRANCH:      ${{ github.ref_name }}
+          ACTOR:       ${{ github.actor }}
+          RUN_ID:      ${{ github.run_id }}
+          RUN_NUMBER:  ${{ github.run_number }}
+          WORKFLOW:    ${{ github.workflow }}
+          SHA:         ${{ github.sha }}
+          EVENT:       ${{ github.event_name }}
+          PRETTIER:    ${{ steps.prettier.outcome }}
+          ESLINT:      ${{ steps.eslint.outcome }}
+          TYPECHECK:   ${{ steps.typecheck.outcome }}
+        run: |
+          import json, os, urllib.request
+
+          steps = {
+              "Prettier":   os.environ["PRETTIER"],
+              "ESLint":     os.environ["ESLINT"],
+              "TypeScript": os.environ["TYPECHECK"],
+          }
+          failed  = [n for n, r in steps.items() if r == "failure"]
+          skipped = [n for n, r in steps.items() if r == "skipped"]
+
+          fields = [
+              {"name": "Repository",   "value": f"[{os.environ['REPO']}](https://github.com/{os.environ['REPO']})", "inline": True},
+              {"name": "Branch",       "value": f"`{os.environ['BRANCH']}`",  "inline": True},
+              {"name": "Event",        "value": f"`{os.environ['EVENT']}`",   "inline": True},
+              {"name": "Triggered By", "value": f"`{os.environ['ACTOR']}`",   "inline": True},
+              {"name": "Commit",       "value": f"[`{os.environ['SHA'][:7]}`](https://github.com/{os.environ['REPO']}/commit/{os.environ['SHA']})", "inline": True},
+              {"name": "Failed Steps", "value": ", ".join(f"`{s}`" for s in failed) if failed else "None", "inline": False},
+          ]
+          if skipped:
+              fields.append({"name": "Skipped", "value": ", ".join(f"`{s}`" for s in skipped), "inline": False})
+          fields.append({"name": "Workflow Run", "value": f"[View Logs](https://github.com/{os.environ['REPO']}/actions/runs/{os.environ['RUN_ID']})", "inline": False})
+
+          payload = {"embeds": [{
+              "title":       "CI Pipeline — Quality Check Failed",
+              "description": f"One or more quality checks failed on **{os.environ['BRANCH']}**.",
+              "color":       15158332,
+              "fields":      fields,
+              "footer":      {"text": f"{os.environ['WORKFLOW']} | Run #{os.environ['RUN_NUMBER']}"},
+          }]}
+
+          req = urllib.request.Request(
+              os.environ["WEBHOOK_URL"],
+              data=json.dumps(payload).encode(),
+              headers={"Content-Type": "application/json"},
+              method="POST",
+          )
+          with urllib.request.urlopen(req): pass

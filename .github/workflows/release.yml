@@ -1,0 +1,235 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents:      write
+  issues:        write
+  pull-requests: write
+  id-token:      write
+
+jobs:
+  semantic-release:
+    name: Semantic Release
+    runs-on: ubuntu-latest
+    outputs:
+      new_release_published: ${{ steps.release.outputs.new_release_published }}
+      new_release_version:   ${{ steps.release.outputs.new_release_version }}
+      new_release_git_tag:   ${{ steps.release.outputs.new_release_git_tag }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run semantic-release
+        id: release
+        env:
+          GITHUB_TOKEN:        ${{ secrets.GITHUB_TOKEN }}
+          GIT_AUTHOR_NAME:     github-actions[bot]
+          GIT_AUTHOR_EMAIL:    github-actions[bot]@users.noreply.github.com
+          GIT_COMMITTER_NAME:  github-actions[bot]
+          GIT_COMMITTER_EMAIL: github-actions[bot]@users.noreply.github.com
+        run: npx semantic-release
+
+      - name: Notify Discord — semantic-release failure
+        if: failure()
+        shell: python
+        env:
+          WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_CI }}
+          REPO:        ${{ github.repository }}
+          BRANCH:      ${{ github.ref_name }}
+          ACTOR:       ${{ github.actor }}
+          RUN_ID:      ${{ github.run_id }}
+          RUN_NUMBER:  ${{ github.run_number }}
+          WORKFLOW:    ${{ github.workflow }}
+          SHA:         ${{ github.sha }}
+        run: |
+          import json, os, urllib.request
+
+          payload = {"embeds": [{
+              "title":       "Release Pipeline — semantic-release Failed",
+              "description": f"Version determination failed for **{os.environ['REPO']}**. No release was created.",
+              "color":       15158332,
+              "fields": [
+                  {"name": "Repository",   "value": f"[{os.environ['REPO']}](https://github.com/{os.environ['REPO']})", "inline": True},
+                  {"name": "Branch",       "value": f"`{os.environ['BRANCH']}`",  "inline": True},
+                  {"name": "Triggered By", "value": f"`{os.environ['ACTOR']}`",   "inline": True},
+                  {"name": "Commit",       "value": f"[`{os.environ['SHA'][:7]}`](https://github.com/{os.environ['REPO']}/commit/{os.environ['SHA']})", "inline": True},
+                  {"name": "Workflow Run", "value": f"[View Logs](https://github.com/{os.environ['REPO']}/actions/runs/{os.environ['RUN_ID']})", "inline": False},
+              ],
+              "footer": {"text": f"{os.environ['WORKFLOW']} | Run #{os.environ['RUN_NUMBER']}"},
+          }]}
+
+          req = urllib.request.Request(
+              os.environ["WEBHOOK_URL"],
+              data=json.dumps(payload).encode(),
+              headers={"Content-Type": "application/json"},
+              method="POST",
+          )
+          with urllib.request.urlopen(req): pass
+
+  build-windows:
+    name: Build — Windows (x64)
+    runs-on: windows-latest
+    needs: semantic-release
+    if: needs.semantic-release.outputs.new_release_published == 'true'
+
+    steps:
+      - name: Checkout release tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.semantic-release.outputs.new_release_git_tag }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build and publish
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npm run build:win -- --publish always
+
+  build-macos:
+    name: Build — macOS (universal)
+    runs-on: macos-latest
+    needs: semantic-release
+    if: needs.semantic-release.outputs.new_release_published == 'true'
+
+    steps:
+      - name: Checkout release tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.semantic-release.outputs.new_release_git_tag }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build and publish
+        env:
+          GH_TOKEN:         ${{ secrets.GITHUB_TOKEN }}
+          CSC_LINK:         ${{ secrets.MAC_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.MAC_CSC_KEY_PASSWORD }}
+        run: npm run build:mac -- --publish always
+
+  build-linux:
+    name: Build — Linux (AppImage)
+    runs-on: ubuntu-latest
+    needs: semantic-release
+    if: needs.semantic-release.outputs.new_release_published == 'true'
+
+    steps:
+      - name: Checkout release tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.semantic-release.outputs.new_release_git_tag }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Linux build dependencies
+        run: sudo apt-get update && sudo apt-get install -y libarchive-tools
+
+      - name: Build and publish
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npm run build:linux -- --publish always
+
+  notify:
+    name: Notify Discord — Release Summary
+    runs-on: ubuntu-latest
+    needs: [semantic-release, build-windows, build-macos, build-linux]
+    if: always() && needs.semantic-release.outputs.new_release_published == 'true'
+
+    steps:
+      - name: Post release summary
+        shell: python
+        env:
+          WEBHOOK_URL:  ${{ secrets.DISCORD_WEBHOOK_RELEASES }}
+          REPO:         ${{ github.repository }}
+          ACTOR:        ${{ github.actor }}
+          RUN_ID:       ${{ github.run_id }}
+          RUN_NUMBER:   ${{ github.run_number }}
+          WORKFLOW:     ${{ github.workflow }}
+          SHA:          ${{ github.sha }}
+          VERSION:      ${{ needs.semantic-release.outputs.new_release_version }}
+          TAG:          ${{ needs.semantic-release.outputs.new_release_git_tag }}
+          WIN_RESULT:   ${{ needs.build-windows.result }}
+          MAC_RESULT:   ${{ needs.build-macos.result }}
+          LINUX_RESULT: ${{ needs.build-linux.result }}
+        run: |
+          import json, os, urllib.request
+
+          def badge(r):
+              return {"success": "[PASS]", "failure": "[FAIL]", "cancelled": "[CANCELLED]"}.get(r, "[SKIPPED]")
+
+          win   = os.environ["WIN_RESULT"]
+          mac   = os.environ["MAC_RESULT"]
+          linux = os.environ["LINUX_RESULT"]
+
+          all_passed = all(r == "success" for r in [win, mac, linux])
+          any_failed = any(r == "failure" for r in [win, mac, linux])
+          color      = 3066993 if all_passed else (15158332 if any_failed else 16776960)
+          label      = "All Platforms Built Successfully" if all_passed else "Build Completed with Failures"
+
+          repo = os.environ["REPO"]
+          tag  = os.environ["TAG"]
+          ver  = os.environ["VERSION"]
+
+          payload = {"embeds": [{
+              "title":       f"Release {tag} — {label}",
+              "description": (
+                  f"**THEBOIS Overlay** `{ver}` has been published.\n"
+                  f"Installers are attached to the [GitHub Release](https://github.com/{repo}/releases/tag/{tag})."
+              ),
+              "color": color,
+              "fields": [
+                  {"name": "Version",              "value": f"`{ver}`",                "inline": True},
+                  {"name": "Tag",                  "value": f"`{tag}`",                "inline": True},
+                  {"name": "Triggered By",         "value": f"`{os.environ['ACTOR']}`","inline": True},
+                  {"name": "Windows (x64 NSIS)",   "value": badge(win),               "inline": True},
+                  {"name": "macOS (DMG)",           "value": badge(mac),               "inline": True},
+                  {"name": "Linux (AppImage)",      "value": badge(linux),             "inline": True},
+                  {"name": "Release Notes",         "value": f"[View Release](https://github.com/{repo}/releases/tag/{tag})", "inline": False},
+                  {"name": "Workflow Run",          "value": f"[View Logs](https://github.com/{repo}/actions/runs/{os.environ['RUN_ID']})", "inline": False},
+              ],
+              "footer": {"text": f"{os.environ['WORKFLOW']} | Run #{os.environ['RUN_NUMBER']}"},
+          }]}
+
+          req = urllib.request.Request(
+              os.environ["WEBHOOK_URL"],
+              data=json.dumps(payload).encode(),
+              headers={"Content-Type": "application/json"},
+              method="POST",
+          )
+          with urllib.request.urlopen(req): pass

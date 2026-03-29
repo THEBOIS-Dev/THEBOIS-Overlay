@@ -1,0 +1,107 @@
+{
+  "name": "thebois-overlay",
+  "version": "1.0.0",
+  "description": "THEBOIS Overlay \u2013 PikaNetwork BedWars stat tracker",
+  "private": true,
+  "main": "./out/main/index.js",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "vue-tsc --noEmit && electron-vite build",
+    "preview": "electron-vite preview",
+    "build:win": "npm run build && electron-builder --win",
+    "build:mac": "npm run build && electron-builder --mac",
+    "build:linux": "npm run build && electron-builder --linux",
+    "lint": "eslint . --max-warnings 0",
+    "lint:fix": "eslint . --fix --max-warnings 0",
+    "format": "prettier --write \"src/**/*.{ts,vue,css,html}\"",
+    "format:check": "prettier --check \"src/**/*.{ts,vue,css,html}\"",
+    "typecheck": "vue-tsc --noEmit",
+    "fix": "npm run lint:fix && npm run format"
+  },
+  "build": {
+    "appId": "com.thebois.overlay",
+    "productName": "THEBOIS Overlay",
+    "files": [
+      "out/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "resources/",
+        "to": "resources/",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "resources/icon.ico"
+    },
+    "mac": {
+      "target": "dmg",
+      "icon": "resources/icon.icns"
+    },
+    "linux": {
+      "target": "AppImage",
+      "icon": "resources/icon.png"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "oqzx",
+      "repo": "THEBOIS-Overlay",
+      "releaseType": "release",
+      "draft": false
+    }
+  },
+  "dependencies": {
+    "@electron-toolkit/preload": "latest",
+    "@electron-toolkit/utils": "latest",
+    "@logdna/tail-file": "latest",
+    "axios": "latest",
+    "discord-rpc": "latest",
+    "electron-updater": "latest",
+    "electron-window-state": "latest",
+    "pinia": "latest",
+    "pinia-plugin-persistedstate": "latest",
+    "vue": "latest",
+    "vue-router": "latest"
+  },
+  "devDependencies": {
+    "@electron-toolkit/tsconfig": "latest",
+    "@tailwindcss/vite": "latest",
+    "@types/node": "latest",
+    "@vitejs/plugin-vue": "latest",
+    "@vue/tsconfig": "latest",
+    "conventional-changelog-conventionalcommits": "^8.0.0",
+    "electron": "latest",
+    "electron-builder": "latest",
+    "electron-vite": "latest",
+    "eslint": "^9.0.0",
+    "eslint-config-prettier": "^10.0.0",
+    "eslint-plugin-vue": "^9.0.0",
+    "prettier": "^3.0.0",
+    "semantic-release": "^24.0.0",
+    "@semantic-release/changelog": "^6.0.0",
+    "@semantic-release/commit-analyzer": "^13.0.0",
+    "@semantic-release/git": "^10.0.0",
+    "@semantic-release/github": "^10.0.0",
+    "@semantic-release/npm": "^12.0.0",
+    "@semantic-release/release-notes-generator": "^14.0.0",
+    "tailwindcss": "latest",
+    "typescript": "latest",
+    "typescript-eslint": "^8.0.0",
+    "vue-eslint-parser": "^9.0.0",
+    "vue-tsc": "latest"
+  }
+}

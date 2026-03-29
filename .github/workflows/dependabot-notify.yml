@@ -1,0 +1,73 @@
+name: Dependabot Notify
+
+on:
+  pull_request_target:
+    types: [opened, reopened]
+
+permissions:
+  contents:      read
+  pull-requests: read
+
+jobs:
+  notify:
+    name: Notify Discord — Dependency Update
+    runs-on: ubuntu-latest
+    if: github.actor == 'dependabot[bot]'
+
+    steps:
+      - name: Extract Dependabot metadata
+        id: meta
+        uses: dependabot/fetch-metadata@v2
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Post to Discord
+        shell: python
+        env:
+          WEBHOOK_URL:  ${{ secrets.DISCORD_WEBHOOK_DEPENDABOT }}
+          REPO:         ${{ github.repository }}
+          PR_NUMBER:    ${{ github.event.pull_request.number }}
+          PR_TITLE:     ${{ github.event.pull_request.title }}
+          PR_URL:       ${{ github.event.pull_request.html_url }}
+          ECOSYSTEM:    ${{ steps.meta.outputs.package-ecosystem }}
+          DEP_NAMES:    ${{ steps.meta.outputs.dependency-names }}
+          UPDATE_TYPE:  ${{ steps.meta.outputs.update-type }}
+          PREV_VERSION: ${{ steps.meta.outputs.previous-version }}
+          NEW_VERSION:  ${{ steps.meta.outputs.new-version }}
+          COMPAT_SCORE: ${{ steps.meta.outputs.compatibility-score }}
+        run: |
+          import json, os, urllib.request
+
+          color_map = {
+              "version-update:semver-major": 15158332,
+              "version-update:semver-minor": 16776960,
+              "version-update:semver-patch": 3447003,
+          }
+          color = color_map.get(os.environ.get("UPDATE_TYPE", ""), 9807270)
+          compat = os.environ.get("COMPAT_SCORE", "")
+
+          payload = {"embeds": [{
+              "title":       f"Dependabot — PR #{os.environ['PR_NUMBER']} Opened",
+              "description": f"**{os.environ['PR_TITLE']}**",
+              "url":         os.environ["PR_URL"],
+              "color":       color,
+              "fields": [
+                  {"name": "Repository",          "value": f"[{os.environ['REPO']}](https://github.com/{os.environ['REPO']})", "inline": True},
+                  {"name": "Package Ecosystem",   "value": f"`{os.environ.get('ECOSYSTEM', 'unknown')}`", "inline": True},
+                  {"name": "Dependency",          "value": f"`{os.environ.get('DEP_NAMES', 'unknown')}`", "inline": False},
+                  {"name": "Previous Version",    "value": f"`{os.environ.get('PREV_VERSION', '—')}`",   "inline": True},
+                  {"name": "New Version",         "value": f"`{os.environ.get('NEW_VERSION', '—')}`",    "inline": True},
+                  {"name": "Update Type",         "value": f"`{os.environ.get('UPDATE_TYPE', '—')}`",    "inline": True},
+                  {"name": "Compatibility Score", "value": f"`{compat}%`" if compat else "—",            "inline": True},
+                  {"name": "Pull Request",        "value": f"[View PR #{os.environ['PR_NUMBER']}]({os.environ['PR_URL']})", "inline": False},
+              ],
+              "footer": {"text": "Dependabot | Automated Dependency Update"},
+          }]}
+
+          req = urllib.request.Request(
+              os.environ["WEBHOOK_URL"],
+              data=json.dumps(payload).encode(),
+              headers={"Content-Type": "application/json"},
+              method="POST",
+          )
+          with urllib.request.urlopen(req): pass
