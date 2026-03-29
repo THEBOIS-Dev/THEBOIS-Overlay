@@ -121,13 +121,17 @@ const avgFkdrColor = computed(() => {
             font-family: var(--font-mono);
             font-size: 0.78rem;
           "
-          >/who</code
         >
+          /who
+        </code>
         in-game
       </span>
     </div>
 
-    <div v-if="sortedPlayers.length === 0" class="flex-1 flex flex-col items-center justify-center gap-4">
+    <div
+      v-if="sortedPlayers.length === 0"
+      class="flex-1 flex flex-col items-center justify-center gap-4"
+    >
       <div style="position: relative; width: 64px; height: 64px">
         <div
           style="
@@ -165,7 +169,14 @@ const avgFkdrColor = computed(() => {
         </svg>
       </div>
       <div class="text-center" style="color: var(--color-ink-3)">
-        <div style="font-size: 0.92rem; font-weight: 500; margin-bottom: 4px; color: var(--color-ink-2)">
+        <div
+          style="
+            font-size: 0.92rem;
+            font-weight: 500;
+            margin-bottom: 4px;
+            color: var(--color-ink-2);
+          "
+        >
           No players yet
         </div>
         <div style="font-size: 0.8rem; opacity: 0.65">Join a game or add players manually.</div>
@@ -253,9 +264,7 @@ const avgFkdrColor = computed(() => {
           </span>
           <span style="opacity: 0.6">/{{ players.playersCount }}</span>
         </span>
-        <span :style="{ color: avgFkdrColor, fontWeight: 600 }">
-          avg {{ avgFkdr }} FKDR
-        </span>
+        <span :style="{ color: avgFkdrColor, fontWeight: 600 }">avg {{ avgFkdr }} FKDR</span>
       </div>
     </div>
   </div>

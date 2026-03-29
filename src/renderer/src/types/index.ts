@@ -11,10 +11,10 @@ export interface PikaStatGroup {
 }
 
 export interface PikaBedwarsStats {
-  'Wins'?: PikaStatGroup
-  'Losses'?: PikaStatGroup
-  'Kills'?: PikaStatGroup
-  'Deaths'?: PikaStatGroup
+  Wins?: PikaStatGroup
+  Losses?: PikaStatGroup
+  Kills?: PikaStatGroup
+  Deaths?: PikaStatGroup
   'Final kills'?: PikaStatGroup
   'Final deaths'?: PikaStatGroup
   'Beds destroyed'?: PikaStatGroup

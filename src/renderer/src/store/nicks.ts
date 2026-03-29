@@ -20,7 +20,10 @@ export const useNicksStore = defineStore('nicks', {
     },
     update(id: string, nick: string, realName: string): void {
       const n = this.nicks.find((x) => x.id === id)
-      if (n) { n.nick = nick; n.realName = realName }
+      if (n) {
+        n.nick = nick
+        n.realName = realName
+      }
     },
   },
 

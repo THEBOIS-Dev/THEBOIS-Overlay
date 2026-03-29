@@ -34,10 +34,7 @@ function isOnResizeEdge(e: MouseEvent): boolean {
   const w = window.innerWidth
   const h = window.innerHeight
   return (
-    x <= RESIZE_EDGE_PX ||
-    x >= w - RESIZE_EDGE_PX ||
-    y <= RESIZE_EDGE_PX ||
-    y >= h - RESIZE_EDGE_PX
+    x <= RESIZE_EDGE_PX || x >= w - RESIZE_EDGE_PX || y <= RESIZE_EDGE_PX || y >= h - RESIZE_EDGE_PX
   )
 }
 
@@ -48,10 +45,7 @@ function isScrollable(el: HTMLElement): boolean {
   let node: HTMLElement | null = el
   while (node && node !== document.documentElement) {
     const { overflowY } = window.getComputedStyle(node)
-    if (
-      (overflowY === 'auto' || overflowY === 'scroll') &&
-      node.scrollHeight > node.clientHeight
-    ) {
+    if ((overflowY === 'auto' || overflowY === 'scroll') && node.scrollHeight > node.clientHeight) {
       return true
     }
     node = node.parentElement
@@ -345,7 +339,7 @@ onUnmounted(() => {
     />
     <div class="relative flex flex-col flex-1 overflow-hidden" style="z-index: 1">
       <TitleBar />
-      <router-view class="flex-1 overflow-hidden" v-slot="{ Component }">
+      <router-view v-slot="{ Component }" class="flex-1 overflow-hidden">
         <Transition name="fade" mode="out-in">
           <component :is="Component" />
         </Transition>

@@ -1,12 +1,4 @@
-import {
-  app,
-  shell,
-  BrowserWindow,
-  ipcMain,
-  dialog,
-  clipboard,
-  globalShortcut,
-} from 'electron'
+import { app, shell, BrowserWindow, ipcMain, dialog, clipboard, globalShortcut } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { autoUpdater } from 'electron-updater'
@@ -229,13 +221,13 @@ function createWindow(): void {
   })
 
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
-    win.loadURL(process.env['ELECTRON_RENDERER_URL'])
+    void win.loadURL(process.env['ELECTRON_RENDERER_URL'])
   } else {
-    win.loadFile(join(__dirname, '../renderer/index.html'))
+    void win.loadFile(join(__dirname, '../renderer/index.html'))
   }
 }
 
-app.whenReady().then(async () => {
+void app.whenReady().then(async () => {
   electronApp.setAppUserModelId('com.thebois.overlay')
   app.on('browser-window-created', (_, w) => optimizer.watchWindowShortcuts(w))
   if (process.platform === 'linux') await sleep(500)
@@ -252,7 +244,7 @@ ipcMain.on('win:toggle-minimize', () => {
   if (win?.isMinimized()) win?.showInactive()
   else win?.minimize()
 })
-ipcMain.on('win:open-external', (_, url: string) => shell.openExternal(url))
+ipcMain.on('win:open-external', (_, url: string) => void shell.openExternal(url))
 
 ipcMain.on('win:set-ignore-mouse', (_, ignore: boolean) => {
   if (!win) return
@@ -322,8 +314,7 @@ ipcMain.handle(
       const stats =
         sRes.status === 'fulfilled' && sRes.value.status === 200 ? sRes.value.data : null
       const notFound =
-        pRes.status === 'fulfilled' &&
-        (pRes.value.status === 404 || pRes.value.status === 400)
+        pRes.status === 'fulfilled' && (pRes.value.status === 404 || pRes.value.status === 400)
       const rateLimit = pRes.status === 'fulfilled' && pRes.value.status === 429
 
       if (notFound) dbg.ipc(`pika:fetch "${username}" → NOT FOUND`)
@@ -396,18 +387,20 @@ async function startTail(path: string): Promise<void> {
   await stopTail()
   try {
     logTail = new TailFile(path, { pollFileIntervalMs: 1000 })
-    logTail.on('error', async () => {
+    logTail.on('error', () => {
       if (!restartTimer) {
-        restartTimer = setTimeout(async () => {
-          restartTimer = null
-          if (logTail) {
-            const readable = await fs.promises
-              .access(path, fs.constants.R_OK)
-              .then(() => true)
-              .catch(() => false)
-            if (readable) await startTail(path).catch(() => {})
-            else await stopTail()
-          }
+        restartTimer = setTimeout(() => {
+          void (async () => {
+            restartTimer = null
+            if (logTail) {
+              const readable = await fs.promises
+                .access(path, fs.constants.R_OK)
+                .then(() => true)
+                .catch(() => false)
+              if (readable) await startTail(path).catch(() => {})
+              else await stopTail()
+            }
+          })()
         }, 2000)
       }
     })
@@ -423,12 +416,14 @@ async function startTail(path: string): Promise<void> {
   }
 }
 
-ipcMain.on('log:set-path', async (_, path: string | null) => {
-  if (!path) {
-    await stopTail()
-    return
-  }
-  await startTail(path)
+ipcMain.on('log:set-path', (_, path: string | null) => {
+  void (async () => {
+    if (!path) {
+      await stopTail()
+      return
+    }
+    await startTail(path)
+  })()
 })
 
 ipcMain.handle('log:check-path', (_, path: string) =>
@@ -448,9 +443,7 @@ ipcMain.handle('log:open-dialog', () =>
 ipcMain.handle('app:open-image-dialog', () =>
   dialog.showOpenDialog(win!, {
     title: 'Choose Background Image',
-    filters: [
-      { name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp'] },
-    ],
+    filters: [{ name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp'] }],
     properties: ['openFile'],
   }),
 )
@@ -583,10 +576,12 @@ ipcMain.handle('rpc:init', async () => {
   await initRPC()
 })
 
-ipcMain.on('rpc:set-enabled', async (_, enabled: boolean) => {
-  dbg.rpc(`rpc:set-enabled  enabled=${enabled}`)
-  if (enabled) await initRPC()
-  else await destroyRPC()
+ipcMain.on('rpc:set-enabled', (_, enabled: boolean) => {
+  void (async () => {
+    dbg.rpc(`rpc:set-enabled  enabled=${enabled}`)
+    if (enabled) await initRPC()
+    else await destroyRPC()
+  })()
 })
 
 ipcMain.on('rpc:set-active', (_, active: boolean) => {
@@ -597,8 +592,8 @@ ipcMain.on('rpc:set-active', (_, active: boolean) => {
 
 ipcMain.on('rpc:update', () => {})
 
-ipcMain.on('rpc:destroy', async () => {
-  await destroyRPC()
+ipcMain.on('rpc:destroy', () => {
+  void destroyRPC()
 })
 
 autoUpdater.autoDownload = true
@@ -643,9 +638,11 @@ ipcMain.on('updater:install', () => {
   autoUpdater.quitAndInstall()
 })
 
-app.on('will-quit', async () => {
-  for (const s of registeredShortcuts) globalShortcut.unregister(s)
-  await stopTail()
-  await destroyRPC()
-  cache.clear()
+app.on('will-quit', () => {
+  void (async () => {
+    for (const s of registeredShortcuts) globalShortcut.unregister(s)
+    await stopTail()
+    await destroyRPC()
+    cache.clear()
+  })()
 })

@@ -7,8 +7,7 @@
  * This means color codes arrive as "\uFFFDr" instead of "§r". We handle both.
  */
 
-const CHAT_REGEXP =
-  /^\[[0-9]{2}:[0-9]{2}:[0-9]{2}\] \[[^\]]+\/INFO\]: (?:\[CHAT\] )?(.+)$/
+const CHAT_REGEXP = /^\[[0-9]{2}:[0-9]{2}:[0-9]{2}\] \[[^\]]+\/INFO\]: (?:\[CHAT\] )?(.+)$/
 
 const MC_NAME = '[A-Za-z0-9_]{1,16}'
 
@@ -31,13 +30,13 @@ const PATTERNS = {
 export function stripColorCodes(str: string): string {
   return str
     .replace(/[\u00A7\uFFFD][0-9A-FK-OR]/gi, '') // §X or <FFFD>X
-    .replace(/[\u00A7\uFFFD]/g, '')               // any lone section/replacement char
+    .replace(/[\u00A7\uFFFD]/g, '') // any lone section/replacement char
 }
 
 export type LogEvent =
-  | { type: 'join';      name: string }
-  | { type: 'quit';      name: string }
-  | { type: 'who';       names: string[] }
+  | { type: 'join'; name: string }
+  | { type: 'quit'; name: string }
+  | { type: 'who'; names: string[] }
   | { type: 'finalKill'; name: string }
 
 export function parseLine(raw: string): LogEvent | null {

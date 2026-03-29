@@ -129,8 +129,9 @@ onMounted(() => checkPath())
           <code
             class="px-1 rounded"
             style="background: rgba(255, 255, 255, 0.07); font-family: var(--font-mono)"
-            >/who</code
           >
+            /who
+          </code>
           in-game to instantly populate the overlay.
         </p>
       </div>

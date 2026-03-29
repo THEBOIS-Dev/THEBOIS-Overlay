@@ -128,8 +128,14 @@ function save(): void {
                 <button
                   class="btn w-6 h-6 rounded"
                   style="color: var(--color-ink-3)"
-                  onmouseover="this.style.background='rgba(248,113,113,0.15)';this.style.color='var(--color-bad)'"
-                  onmouseout="this.style.background='';this.style.color='var(--color-ink-3)'"
+                  onmouseover="
+                    this.style.background = 'rgba(248,113,113,0.15)'
+                    this.style.color = 'var(--color-bad)'
+                  "
+                  onmouseout="
+                    this.style.background = ''
+                    this.style.color = 'var(--color-ink-3)'
+                  "
                   @click="nicks.remove(nick.id)"
                 >
                   <svg viewBox="0 0 24 24" width="11" height="11" fill="currentColor">

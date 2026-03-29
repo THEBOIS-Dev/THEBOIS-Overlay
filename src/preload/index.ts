@@ -67,12 +67,7 @@ const api = {
     check: () => ipcRenderer.send('updater:check'),
     install: () => ipcRenderer.send('updater:install'),
     onStatus: (
-      cb: (payload: {
-        status: string
-        version?: string
-        percent?: number
-        error?: string
-      }) => void,
+      cb: (payload: { status: string; version?: string; percent?: number; error?: string }) => void,
     ): (() => void) => {
       const handler = (_: IpcRendererEvent, payload: unknown): void =>
         cb(
