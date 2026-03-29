@@ -1,0 +1,26 @@
+name: Test Discord Webhook
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Validate secret
+        run: |
+          if [ -z "${{ secrets.DISCORD_WEBHOOK_CODEQL }}" ]; then
+            echo "Secret is empty"
+            exit 1
+          else
+            echo "Secret is set"
+          fi
+
+      - name: Send request
+        env:
+          WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_CODEQL }}
+        run: |
+          curl -X POST "$WEBHOOK_URL" \
+          -H "Content-Type: application/json" \
+          -d '{"content":"Webhook test from GitHub Actions"}'

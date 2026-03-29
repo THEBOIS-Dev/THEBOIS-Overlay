@@ -39,6 +39,7 @@ jobs:
 
       - name: Notify Discord
         if: always()
+        continue-on-error: true
         shell: python
         env:
           WEBHOOK_URL:  ${{ secrets.DISCORD_WEBHOOK_CODEQL }}
@@ -80,10 +81,13 @@ jobs:
               "footer": {"text": f"{os.environ['WORKFLOW']} | Run #{os.environ['RUN_NUMBER']}"},
           }]}
 
-          req = urllib.request.Request(
-              os.environ["WEBHOOK_URL"],
-              data=json.dumps(payload).encode(),
-              headers={"Content-Type": "application/json"},
-              method="POST",
-          )
-          with urllib.request.urlopen(req): pass
+          try:
+              req = urllib.request.Request(
+                  os.environ["WEBHOOK_URL"],
+                  data=json.dumps(payload).encode(),
+                  headers={"Content-Type": "application/json"},
+                  method="POST",
+              )
+              with urllib.request.urlopen(req): pass
+          except Exception as e:
+              print(f"Discord webhook failed: {e}")
