@@ -16,6 +16,8 @@ import fs from 'fs'
 import readline from 'readline'
 import TailFile from '@logdna/tail-file'
 
+// test
+
 const PIKA_BASE = 'https://stats.pika-network.net/api'
 const TIMEOUT_MS = 8_000
 const MAX_RETRIES = 3
