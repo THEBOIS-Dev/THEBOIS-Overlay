@@ -83,7 +83,7 @@
     "@types/node": "latest",
     "@vitejs/plugin-vue": "latest",
     "@vue/tsconfig": "latest",
-    "conventional-changelog-conventionalcommits": "^8.0.0",
+    "conventional-changelog-conventionalcommits": "^9.3.1",
     "electron": "latest",
     "electron-builder": "latest",
     "electron-vite": "latest",
