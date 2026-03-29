@@ -21,7 +21,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
           cache: npm
 
       - name: Install dependencies
@@ -29,11 +29,11 @@ jobs:
 
       - name: Prettier
         id: prettier
-        run: npx prettier --write . --ignore-unknown
+        run: npm run format:check
 
       - name: ESLint
         id: eslint
-        run: npm run lint:fix
+        run: npm run lint
 
       - name: TypeScript
         id: typecheck
@@ -103,6 +103,6 @@ jobs:
                   headers={"Content-Type": "application/json"},
                   method="POST",
               )
-              urllib.request.urlopen(req)
+              with urllib.request.urlopen(req): pass
           except Exception as e:
-              print(e)
+              print(f"Discord webhook failed: {e}")
