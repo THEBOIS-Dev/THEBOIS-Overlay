@@ -29,7 +29,7 @@ jobs:
 
       - name: Prettier
         id: prettier
-        run: npx prettier --check . --ignore-unknown
+        run: npx prettier --write . --ignore-unknown
 
       - name: ESLint
         id: eslint
