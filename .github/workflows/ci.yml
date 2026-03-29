@@ -33,7 +33,7 @@ jobs:
 
       - name: ESLint
         id: eslint
-        run: npm run lint
+        run: npm run lint:fix
 
       - name: TypeScript
         id: typecheck
