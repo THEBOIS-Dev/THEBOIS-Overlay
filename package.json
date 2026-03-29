@@ -103,7 +103,7 @@
     "tailwindcss": "latest",
     "typescript": "latest",
     "typescript-eslint": "^8.0.0",
-    "vue-eslint-parser": "^9.0.0",
+    "vue-eslint-parser": "^10.4.0",
     "vue-tsc": "latest"
   }
 }
