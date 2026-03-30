@@ -55,7 +55,7 @@ jobs:
           [ -z "$WEBHOOK_URL" ] && echo "DISCORD_WEBHOOK_CODEQL secret not set, skipping" && exit 0
 
           if [ "$SCAN_RESULT" = "success" ]; then
-            COLOR=3066993
+            COLOR=327424
             STATUS="Completed Successfully"
           else
             COLOR=15158332
@@ -64,7 +64,7 @@ jobs:
 
           PAYLOAD=$(jq -nc \
             --arg title "CodeQL — ${STATUS}" \
-            --arg desc "**Branch:** \`${BRANCH}\`\n**Commit:** \`${SHA:0:7}\`\n**Event:** ${EVENT}" \
+            --arg desc $'**Branch:** `'"${BRANCH}"$'\n**Commit:** `'"${SHA:0:7}"$'\n**Event:** '"${EVENT}" \
             --arg result "$SCAN_RESULT" \
             --arg alerts "https://github.com/${REPO}/security/code-scanning" \
             --arg logs "https://github.com/${REPO}/actions/runs/${RUN_ID}" \
