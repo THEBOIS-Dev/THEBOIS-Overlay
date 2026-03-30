@@ -44,7 +44,7 @@ function save(): void {
       <div>
         <h2 class="text-sm font-semibold" style="color: var(--color-ink-1)">Nick Manager</h2>
         <p class="text-xs mt-0.5" style="color: var(--color-ink-3)">
-          Map in-game nicks to real usernames.
+          Map in-game nicks to real usernames. TEST!
         </p>
       </div>
       <button class="btn-accent rounded-lg text-xs px-3 py-1.5 no-drag" @click="openAdd">
