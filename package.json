@@ -1,6 +1,6 @@
 {
   "name": "thebois-overlay",
-  "version": "1.1.5",
+  "version": "1.1.6",
   "description": "THEBOIS Overlay – PikaNetwork BedWars stat tracker",
   "private": true,
   "main": "./out/main/index.js",
