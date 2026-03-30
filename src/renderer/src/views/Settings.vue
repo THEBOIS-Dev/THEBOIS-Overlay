@@ -381,21 +381,6 @@ async function onShortcutChange(
         </Section>
       </div>
 
-      <!-- Discord RPC -->
-      <Section title="Discord Rich Presence">
-        <div class="flex flex-col gap-3">
-          <ToggleSetting
-            label="Enable Discord RPC"
-            :value="config.discordRpcEnabled"
-            @update="config.discordRpcEnabled = $event"
-          />
-          <p class="text-[11px] px-1" style="color: var(--color-ink-3); line-height: 1.5">
-            Shows your status in Discord. Active when log is streaming, Idle after 15 seconds of
-            inactivity.
-          </p>
-        </div>
-      </Section>
-
       <!-- Advanced -->
       <div v-if="activeTab === 'advanced'">
         <Section title="Auto-detection">
