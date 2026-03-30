@@ -1,47 +1,52 @@
-name: CodeQL
+name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, dev]
   pull_request:
-    branches: [main]
-  schedule:
-    - cron: "0 8 * * 1"
+    branches: [main, dev]
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 permissions:
-  contents:        read
-  security-events: write
-  actions:         read
+  contents: read
 
 jobs:
-  analyze:
-    name: Analyze — JavaScript / TypeScript
+  quality:
+    name: Quality Checks
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Initialize CodeQL
-        uses: github/codeql-action/init@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
         with:
-          languages: javascript-typescript
-          queries: security-and-quality
+          node-version: 24
+          cache: npm
 
-      - name: Autobuild
-        uses: github/codeql-action/autobuild@v4
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
 
-      - name: Perform CodeQL analysis
-        id: codeql
-        uses: github/codeql-action/analyze@v4
-        with:
-          category: /language:javascript-typescript
+      - name: Prettier
+        id: prettier
+        run: npm run format
 
-      - name: Notify Discord
-        if: always()
+      - name: ESLint
+        id: eslint
+        run: npm run lint:fix
+
+      - name: TypeScript
+        id: typecheck
+        run: npm run typecheck
+
+      - name: Notify Discord on Failure
+        if: failure()
         continue-on-error: true
         env:
-          WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_CODEQL }}
+          WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_CI }}
           REPO:        ${{ github.repository }}
           BRANCH:      ${{ github.ref_name }}
           ACTOR:       ${{ github.actor }}
@@ -50,35 +55,105 @@ jobs:
           WORKFLOW:    ${{ github.workflow }}
           SHA:         ${{ github.sha }}
           EVENT:       ${{ github.event_name }}
-          SCAN_RESULT: ${{ steps.codeql.outcome }}
+          PRETTIER:    ${{ steps.prettier.outcome }}
+          ESLINT:      ${{ steps.eslint.outcome }}
+          TYPECHECK:   ${{ steps.typecheck.outcome }}
         run: |
-          [ -z "$WEBHOOK_URL" ] && echo "DISCORD_WEBHOOK_CODEQL secret not set, skipping" && exit 0
+          [ -z "$WEBHOOK_URL" ] && echo "DISCORD_WEBHOOK_CI secret not set, skipping" && exit 0
 
-          if [ "$SCAN_RESULT" = "success" ]; then
-            COLOR=327424
-            STATUS="Completed Successfully"
-          else
-            COLOR=15158332
-            STATUS="Failed"
-          fi
+          badge() {
+            case "$1" in
+              success) echo "Pass"   ;;
+              failure) echo "Failed" ;;
+              *)       echo "Skipped" ;;
+            esac
+          }
+
+          FAILED=""
+          [ "$PRETTIER"  = "failure" ] && FAILED="${FAILED:+$FAILED, }Prettier"
+          [ "$ESLINT"    = "failure" ] && FAILED="${FAILED:+$FAILED, }ESLint"
+          [ "$TYPECHECK" = "failure" ] && FAILED="${FAILED:+$FAILED, }TypeScript"
+          [ -z "$FAILED" ] && FAILED="None"
+
+          desc=$(printf "**Branch:** \`%s\`\n**Commit:** \`%s\`\n**Triggered by:** %s" "$BRANCH" "${SHA:0:7}" "$ACTOR")
 
           PAYLOAD=$(jq -nc \
-            --arg title "CodeQL — ${STATUS}" \
-            --arg desc $'**Branch:** `'"${BRANCH}"$'`\n**Commit:** `'"${SHA:0:7}"$'`\n**Event:** '"${EVENT}" \
-            --arg result "$SCAN_RESULT" \
-            --arg alerts "https://github.com/${REPO}/security/code-scanning" \
+            --arg title "CI — Quality Check Failed" \
+            --arg desc "$desc" \
+            --arg prettier "$(badge "$PRETTIER")" \
+            --arg eslint "$(badge "$ESLINT")" \
+            --arg typecheck "$(badge "$TYPECHECK")" \
+            --arg event "$EVENT" \
             --arg logs "https://github.com/${REPO}/actions/runs/${RUN_ID}" \
             --arg footer "${WORKFLOW} | Run #${RUN_NUMBER}" \
-            --argjson color "$COLOR" \
             '{embeds:[{
               title: $title,
               description: $desc,
-              color: $color,
+              color: 15158332,
               fields: [
-                {name:"Language",        value:"`javascript-typescript`", inline:true},
-                {name:"Result",          value:$result,                  inline:true},
-                {name:"Security Alerts", value:$alerts,                  inline:false},
-                {name:"Logs",            value:$logs,                    inline:false}
+                {name:"Prettier",    value:$prettier,  inline:true},
+                {name:"ESLint",      value:$eslint,    inline:true},
+                {name:"TypeScript",  value:$typecheck, inline:true},
+                {name:"Event",       value:$event,     inline:true},
+                {name:"Logs",        value:$logs,      inline:false}
+              ],
+              footer: {text: $footer}
+            }]}')
+
+          HTTP=$(curl -sS -o /dev/stderr -w "%{http_code}" \
+            -X POST "$WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -d "$PAYLOAD")
+          echo "Discord responded: HTTP $HTTP"
+
+      - name: Notify Discord on Success
+        if: success()
+        continue-on-error: true
+        env:
+          WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_CI }}
+          REPO:        ${{ github.repository }}
+          BRANCH:      ${{ github.ref_name }}
+          ACTOR:       ${{ github.actor }}
+          RUN_ID:      ${{ github.run_id }}
+          RUN_NUMBER:  ${{ github.run_number }}
+          WORKFLOW:    ${{ github.workflow }}
+          SHA:         ${{ github.sha }}
+          EVENT:       ${{ github.event_name }}
+          PRETTIER:    ${{ steps.prettier.outcome }}
+          ESLINT:      ${{ steps.eslint.outcome }}
+          TYPECHECK:   ${{ steps.typecheck.outcome }}
+        run: |
+          [ -z "$WEBHOOK_URL" ] && echo "DISCORD_WEBHOOK_CI secret not set, skipping" && exit 0
+
+          badge() {
+            case "$1" in
+              success) echo "Pass"   ;;
+              failure) echo "Failed" ;;
+              *)       echo "Skipped" ;;
+            esac
+          }
+
+          desc=$(printf "**Branch:** \`%s\`\n**Commit:** \`%s\`\n**Triggered by:** %s" "$BRANCH" "${SHA:0:7}" "$ACTOR")
+
+          PAYLOAD=$(jq -nc \
+            --arg title "CI — Quality Check Passed" \
+            --arg desc "$desc" \
+            --arg prettier "$(badge "$PRETTIER")" \
+            --arg eslint "$(badge "$ESLINT")" \
+            --arg typecheck "$(badge "$TYPECHECK")" \
+            --arg event "$EVENT" \
+            --arg logs "https://github.com/${REPO}/actions/runs/${RUN_ID}" \
+            --arg footer "${WORKFLOW} | Run #${RUN_NUMBER}" \
+            '{embeds:[{
+              title: $title,
+              description: $desc,
+              color: 327424,
+              fields: [
+                {name:"Prettier",    value:$prettier,  inline:true},
+                {name:"ESLint",      value:$eslint,    inline:true},
+                {name:"TypeScript",  value:$typecheck, inline:true},
+                {name:"Event",       value:$event,     inline:true},
+                {name:"Logs",        value:$logs,      inline:false}
               ],
               footer: {text: $footer}
             }]}')
