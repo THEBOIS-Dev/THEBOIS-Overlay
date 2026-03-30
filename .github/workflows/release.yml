@@ -2,11 +2,8 @@ name: Release
 
 on:
   push:
-<<<<<<< HEAD
-=======
     branches:
       - main
->>>>>>> 0a63789 (fix(update): auto update & webhook)
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -18,11 +15,6 @@ permissions:
   id-token:      write
 
 jobs:
-<<<<<<< HEAD
-  build-windows:
-    name: Build — Windows (x64)
-    runs-on: windows-latest
-=======
   get-version:
     name: Read version
     runs-on: ubuntu-latest
@@ -38,7 +30,6 @@ jobs:
     name: Build — Windows (x64)
     runs-on: windows-latest
     needs: get-version
->>>>>>> 0a63789 (fix(update): auto update & webhook)
 
     steps:
       - uses: actions/checkout@v5
