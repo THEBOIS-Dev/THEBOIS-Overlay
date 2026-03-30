@@ -418,7 +418,7 @@ async function onShortcutChange(
             @update="config.autoUpdateEnabled = $event"
           />
           <p class="text-[11px] px-1" style="color: var(--color-ink-3); line-height: 1.5">
-            Automatically checks for updates from GitHub on launch. Downloads and installs on next
+            Automatically checks for updates on launch. Downloads and installs on next
             exit.
           </p>
           <div class="flex items-center justify-between py-2">
