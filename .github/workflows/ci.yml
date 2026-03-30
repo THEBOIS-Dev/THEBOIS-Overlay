@@ -21,7 +21,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: 24
+          node-version: 20
           cache: npm
 
       - name: Install dependencies
@@ -42,7 +42,6 @@ jobs:
       - name: Notify Discord — failure
         if: failure()
         continue-on-error: true
-        shell: python
         env:
           WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_CI }}
           REPO:        ${{ github.repository }}
@@ -57,52 +56,39 @@ jobs:
           ESLINT:      ${{ steps.eslint.outcome }}
           TYPECHECK:   ${{ steps.typecheck.outcome }}
         run: |
-          import json, os, urllib.request
+          FAILED=""
+          [ "$PRETTIER"  = "failure" ] && FAILED="${FAILED:+$FAILED, }Prettier"
+          [ "$ESLINT"    = "failure" ] && FAILED="${FAILED:+$FAILED, }ESLint"
+          [ "$TYPECHECK" = "failure" ] && FAILED="${FAILED:+$FAILED, }TypeScript"
+          [ -z "$FAILED" ] && FAILED="None"
 
-          steps = {
-              "Prettier":   os.environ["PRETTIER"],
-              "ESLint":     os.environ["ESLINT"],
-              "TypeScript": os.environ["TYPECHECK"],
-          }
+          PAYLOAD=$(jq -nc \
+            --arg title "CI Pipeline — Quality Check Failed" \
+            --arg desc "Checks failed on ${BRANCH}" \
+            --arg repo "https://github.com/${REPO}" \
+            --arg branch "$BRANCH" \
+            --arg event "$EVENT" \
+            --arg actor "$ACTOR" \
+            --arg sha "${SHA:0:7}" \
+            --arg failed "$FAILED" \
+            --arg run_url "https://github.com/${REPO}/actions/runs/${RUN_ID}" \
+            --arg footer "${WORKFLOW} | Run #${RUN_NUMBER}" \
+            '{embeds:[{
+              title: $title,
+              description: $desc,
+              color: 15158332,
+              fields: [
+                {name:"Repository",   value:$repo,    inline:true},
+                {name:"Branch",       value:$branch,  inline:true},
+                {name:"Event",        value:$event,   inline:true},
+                {name:"Triggered By", value:$actor,   inline:true},
+                {name:"Commit",       value:$sha,     inline:true},
+                {name:"Failed Steps", value:$failed,  inline:false},
+                {name:"Workflow Run", value:$run_url, inline:false}
+              ],
+              footer: {text: $footer}
+            }]}')
 
-          failed  = [n for n, r in steps.items() if r == "failure"]
-          skipped = [n for n, r in steps.items() if r == "skipped"]
-
-          fields = [
-              {"name": "Repository",   "value": f"https://github.com/{os.environ['REPO']}", "inline": True},
-              {"name": "Branch",       "value": os.environ["BRANCH"], "inline": True},
-              {"name": "Event",        "value": os.environ["EVENT"], "inline": True},
-              {"name": "Triggered By", "value": os.environ["ACTOR"], "inline": True},
-              {"name": "Commit",       "value": os.environ["SHA"][:7], "inline": True},
-              {"name": "Failed Steps", "value": ", ".join(failed) if failed else "None", "inline": False},
-          ]
-
-          if skipped:
-              fields.append({"name": "Skipped", "value": ", ".join(skipped), "inline": False})
-
-          fields.append({
-              "name": "Workflow Run",
-              "value": f"https://github.com/{os.environ['REPO']}/actions/runs/{os.environ['RUN_ID']}",
-              "inline": False
-          })
-
-          payload = {
-              "embeds": [{
-                  "title": "CI Pipeline — Quality Check Failed",
-                  "description": f"Checks failed on {os.environ['BRANCH']}",
-                  "color": 15158332,
-                  "fields": fields,
-                  "footer": {"text": f"{os.environ['WORKFLOW']} | Run #{os.environ['RUN_NUMBER']}"}
-              }]
-          }
-
-          try:
-              req = urllib.request.Request(
-                  os.environ["WEBHOOK_URL"],
-                  data=json.dumps(payload).encode(),
-                  headers={"Content-Type": "application/json"},
-                  method="POST",
-              )
-              with urllib.request.urlopen(req): pass
-          except Exception as e:
-              print(f"Discord webhook failed: {e}")
+          curl -fsSL -X POST "$WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -d "$PAYLOAD"

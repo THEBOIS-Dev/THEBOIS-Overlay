@@ -29,7 +29,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: 24
+          node-version: 20
           cache: npm
 
       - name: Install dependencies
@@ -48,7 +48,6 @@ jobs:
       - name: Notify Discord — semantic-release failure
         if: failure()
         continue-on-error: true
-        shell: python
         env:
           WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_CI }}
           REPO:        ${{ github.repository }}
@@ -59,32 +58,31 @@ jobs:
           WORKFLOW:    ${{ github.workflow }}
           SHA:         ${{ github.sha }}
         run: |
-          import json, os, urllib.request
-
-          payload = {"embeds": [{
-              "title":       "Release Pipeline — semantic-release Failed",
-              "description": f"Version determination failed for **{os.environ['REPO']}**. No release was created.",
-              "color":       15158332,
-              "fields": [
-                  {"name": "Repository",   "value": f"https://github.com/{os.environ['REPO']}", "inline": True},
-                  {"name": "Branch",       "value": os.environ["BRANCH"],  "inline": True},
-                  {"name": "Triggered By", "value": os.environ["ACTOR"],   "inline": True},
-                  {"name": "Commit",       "value": os.environ["SHA"][:7], "inline": True},
-                  {"name": "Workflow Run", "value": f"https://github.com/{os.environ['REPO']}/actions/runs/{os.environ['RUN_ID']}", "inline": False},
+          PAYLOAD=$(jq -nc \
+            --arg title "Release Pipeline — semantic-release Failed" \
+            --arg desc "Version determination failed for **${REPO}**. No release was created." \
+            --arg repo "https://github.com/${REPO}" \
+            --arg branch "$BRANCH" \
+            --arg actor "$ACTOR" \
+            --arg sha "${SHA:0:7}" \
+            --arg run_url "https://github.com/${REPO}/actions/runs/${RUN_ID}" \
+            --arg footer "${WORKFLOW} | Run #${RUN_NUMBER}" \
+            '{embeds:[{
+              title: $title,
+              description: $desc,
+              color: 15158332,
+              fields: [
+                {name:"Repository",   value:$repo,    inline:true},
+                {name:"Branch",       value:$branch,  inline:true},
+                {name:"Triggered By", value:$actor,   inline:true},
+                {name:"Commit",       value:$sha,     inline:true},
+                {name:"Workflow Run", value:$run_url, inline:false}
               ],
-              "footer": {"text": f"{os.environ['WORKFLOW']} | Run #{os.environ['RUN_NUMBER']}"},
-          }]}
-
-          try:
-              req = urllib.request.Request(
-                  os.environ["WEBHOOK_URL"],
-                  data=json.dumps(payload).encode(),
-                  headers={"Content-Type": "application/json"},
-                  method="POST",
-              )
-              with urllib.request.urlopen(req): pass
-          except Exception as e:
-              print(f"Discord webhook failed: {e}")
+              footer: {text: $footer}
+            }]}')
+          curl -fsSL -X POST "$WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -d "$PAYLOAD"
 
   build-windows:
     name: Build — Windows (x64)
@@ -99,14 +97,21 @@ jobs:
 
       - uses: actions/setup-node@v6
         with:
-          node-version: 24
+          node-version: 20
           cache: npm
 
       - run: npm install --no-audit --no-fund
 
-      - env:
+      - name: Build Windows installer
+        run: npm run build:win -- --publish never
+
+      - name: Upload artifacts to release
+        shell: bash
+        env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: npm run build:win -- --publish always
+          TAG:      ${{ needs.semantic-release.outputs.new_release_git_tag }}
+        run: |
+          gh release upload "$TAG" dist/*.exe dist/latest.yml --clobber
 
   build-macos:
     name: Build — macOS (universal)
@@ -121,16 +126,23 @@ jobs:
 
       - uses: actions/setup-node@v6
         with:
-          node-version: 24
+          node-version: 20
           cache: npm
 
       - run: npm install --no-audit --no-fund
 
-      - env:
-          GH_TOKEN:         ${{ secrets.GITHUB_TOKEN }}
+      - name: Build macOS installer
+        env:
           CSC_LINK:         ${{ secrets.MAC_CSC_LINK }}
           CSC_KEY_PASSWORD: ${{ secrets.MAC_CSC_KEY_PASSWORD }}
-        run: npm run build:mac -- --publish always
+        run: npm run build:mac -- --publish never
+
+      - name: Upload artifacts to release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG:      ${{ needs.semantic-release.outputs.new_release_git_tag }}
+        run: |
+          gh release upload "$TAG" dist/*.dmg dist/latest-mac.yml --clobber
 
   build-linux:
     name: Build — Linux (AppImage)
@@ -145,16 +157,22 @@ jobs:
 
       - uses: actions/setup-node@v6
         with:
-          node-version: 24
+          node-version: 20
           cache: npm
 
       - run: npm install --no-audit --no-fund
 
       - run: sudo apt-get update && sudo apt-get install -y libarchive-tools
 
-      - env:
+      - name: Build Linux AppImage
+        run: npm run build:linux -- --publish never
+
+      - name: Upload artifacts to release
+        env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: npm run build:linux -- --publish always
+          TAG:      ${{ needs.semantic-release.outputs.new_release_git_tag }}
+        run: |
+          gh release upload "$TAG" dist/*.AppImage dist/latest-linux.yml --clobber
 
   notify:
     name: Notify Discord — Release Summary
@@ -165,7 +183,6 @@ jobs:
     steps:
       - name: Post to Discord
         continue-on-error: true
-        shell: python
         env:
           WEBHOOK_URL:  ${{ secrets.DISCORD_WEBHOOK_RELEASES }}
           REPO:         ${{ github.repository }}
@@ -173,53 +190,62 @@ jobs:
           RUN_ID:       ${{ github.run_id }}
           RUN_NUMBER:   ${{ github.run_number }}
           WORKFLOW:     ${{ github.workflow }}
-          SHA:          ${{ github.sha }}
           VERSION:      ${{ needs.semantic-release.outputs.new_release_version }}
           TAG:          ${{ needs.semantic-release.outputs.new_release_git_tag }}
           WIN_RESULT:   ${{ needs.build-windows.result }}
           MAC_RESULT:   ${{ needs.build-macos.result }}
           LINUX_RESULT: ${{ needs.build-linux.result }}
         run: |
-          import json, os, urllib.request
+          badge() {
+            case "$1" in
+              success)   echo "Pass" ;;
+              failure)   echo "Failed" ;;
+              cancelled) echo "Cancelled" ;;
+              *)         echo "Skipped" ;;
+            esac
+          }
 
-          def badge(r):
-              return {"success": "Pass", "failure": "Failed", "cancelled": "Cancelled"}.get(r, "Skipped")
+          WIN_BADGE=$(badge "$WIN_RESULT")
+          MAC_BADGE=$(badge "$MAC_RESULT")
+          LINUX_BADGE=$(badge "$LINUX_RESULT")
 
-          win   = os.environ["WIN_RESULT"]
-          mac   = os.environ["MAC_RESULT"]
-          linux = os.environ["LINUX_RESULT"]
+          if [ "$WIN_RESULT" = "success" ] && [ "$MAC_RESULT" = "success" ] && [ "$LINUX_RESULT" = "success" ]; then
+            COLOR=3066993
+            LABEL="All Platforms Built Successfully"
+          elif [ "$WIN_RESULT" = "failure" ] || [ "$MAC_RESULT" = "failure" ] || [ "$LINUX_RESULT" = "failure" ]; then
+            COLOR=15158332
+            LABEL="Build Completed with Failures"
+          else
+            COLOR=16776960
+            LABEL="Build Completed"
+          fi
 
-          all_passed = all(r == "success" for r in [win, mac, linux])
-          any_failed = any(r == "failure" for r in [win, mac, linux])
-          color      = 3066993 if all_passed else (15158332 if any_failed else 16776960)
-          label      = "All Platforms Built Successfully" if all_passed else "Build Completed with Failures"
-
-          repo = os.environ["REPO"]
-          tag  = os.environ["TAG"]
-          ver  = os.environ["VERSION"]
-
-          payload = {"embeds": [{
-              "title":       f"Release {tag} — {label}",
-              "description": f"{ver} has been published. https://github.com/{repo}/releases/tag/{tag}",
-              "color": color,
-              "fields": [
-                  {"name": "Version", "value": ver,         "inline": True},
-                  {"name": "Tag",     "value": tag,         "inline": True},
-                  {"name": "Windows", "value": badge(win),  "inline": True},
-                  {"name": "macOS",   "value": badge(mac),  "inline": True},
-                  {"name": "Linux",   "value": badge(linux),"inline": True},
-                  {"name": "Logs",    "value": f"https://github.com/{repo}/actions/runs/{os.environ['RUN_ID']}", "inline": False},
+          PAYLOAD=$(jq -nc \
+            --arg title "Release ${TAG} — ${LABEL}" \
+            --arg desc "${VERSION} has been published. https://github.com/${REPO}/releases/tag/${TAG}" \
+            --argjson color "$COLOR" \
+            --arg version "$VERSION" \
+            --arg tag "$TAG" \
+            --arg win "$WIN_BADGE" \
+            --arg mac "$MAC_BADGE" \
+            --arg linux "$LINUX_BADGE" \
+            --arg logs "https://github.com/${REPO}/actions/runs/${RUN_ID}" \
+            --arg footer "${WORKFLOW} | Run #${RUN_NUMBER}" \
+            '{embeds:[{
+              title: $title,
+              description: $desc,
+              color: $color,
+              fields: [
+                {name:"Version", value:$version, inline:true},
+                {name:"Tag",     value:$tag,     inline:true},
+                {name:"Windows", value:$win,     inline:true},
+                {name:"macOS",   value:$mac,     inline:true},
+                {name:"Linux",   value:$linux,   inline:true},
+                {name:"Logs",    value:$logs,    inline:false}
               ],
-              "footer": {"text": f"{os.environ['WORKFLOW']} | Run #{os.environ['RUN_NUMBER']}"},
-          }]}
+              footer: {text: $footer}
+            }]}')
 
-          try:
-              req = urllib.request.Request(
-                  os.environ["WEBHOOK_URL"],
-                  data=json.dumps(payload).encode(),
-                  headers={"Content-Type": "application/json"},
-                  method="POST",
-              )
-              with urllib.request.urlopen(req): pass
-          except Exception as e:
-              print(f"Discord webhook failed: {e}")
+          curl -fsSL -X POST "$WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -d "$PAYLOAD"

@@ -23,7 +23,6 @@ jobs:
 
       - name: Post to Discord
         continue-on-error: true
-        shell: python
         env:
           WEBHOOK_URL:  ${{ secrets.DISCORD_WEBHOOK_DEPENDABOT }}
           REPO:         ${{ github.repository }}
@@ -37,41 +36,47 @@ jobs:
           NEW_VERSION:  ${{ steps.meta.outputs.new-version }}
           COMPAT_SCORE: ${{ steps.meta.outputs.compatibility-score }}
         run: |
-          import json, os, urllib.request
+          case "$UPDATE_TYPE" in
+            version-update:semver-major) COLOR=15158332 ;;
+            version-update:semver-minor) COLOR=16776960 ;;
+            version-update:semver-patch) COLOR=3447003  ;;
+            *)                           COLOR=9807270  ;;
+          esac
 
-          color_map = {
-              "version-update:semver-major": 15158332,
-              "version-update:semver-minor": 16776960,
-              "version-update:semver-patch": 3447003,
-          }
-          color  = color_map.get(os.environ.get("UPDATE_TYPE", ""), 9807270)
-          compat = os.environ.get("COMPAT_SCORE", "")
+          COMPAT_DISPLAY="${COMPAT_SCORE}%"
+          [ -z "$COMPAT_SCORE" ] && COMPAT_DISPLAY="—"
 
-          payload = {"embeds": [{
-              "title":       f"Dependabot — PR #{os.environ['PR_NUMBER']} Opened",
-              "description": f"**{os.environ['PR_TITLE']}**",
-              "url":         os.environ["PR_URL"],
-              "color":       color,
-              "fields": [
-                  {"name": "Repository",          "value": f"[{os.environ['REPO']}](https://github.com/{os.environ['REPO']})", "inline": True},
-                  {"name": "Package Ecosystem",   "value": f"`{os.environ.get('ECOSYSTEM', 'unknown')}`", "inline": True},
-                  {"name": "Dependency",          "value": f"`{os.environ.get('DEP_NAMES', 'unknown')}`", "inline": False},
-                  {"name": "Previous Version",    "value": f"`{os.environ.get('PREV_VERSION', '—')}`",   "inline": True},
-                  {"name": "New Version",         "value": f"`{os.environ.get('NEW_VERSION', '—')}`",    "inline": True},
-                  {"name": "Update Type",         "value": f"`{os.environ.get('UPDATE_TYPE', '—')}`",    "inline": True},
-                  {"name": "Compatibility Score", "value": f"`{compat}%`" if compat else "—",            "inline": True},
-                  {"name": "Pull Request",        "value": f"[View PR #{os.environ['PR_NUMBER']}]({os.environ['PR_URL']})", "inline": False},
+          PAYLOAD=$(jq -nc \
+            --arg title "Dependabot — PR #${PR_NUMBER} Opened" \
+            --arg desc "**${PR_TITLE}**" \
+            --arg url "$PR_URL" \
+            --argjson color "$COLOR" \
+            --arg repo "[${REPO}](https://github.com/${REPO})" \
+            --arg ecosystem "\`${ECOSYSTEM:-unknown}\`" \
+            --arg dep "\`${DEP_NAMES:-unknown}\`" \
+            --arg prev "\`${PREV_VERSION:-—}\`" \
+            --arg next "\`${NEW_VERSION:-—}\`" \
+            --arg utype "\`${UPDATE_TYPE:-—}\`" \
+            --arg compat "$COMPAT_DISPLAY" \
+            --arg pr_link "[View PR #${PR_NUMBER}](${PR_URL})" \
+            '{embeds:[{
+              title: $title,
+              description: $desc,
+              url: $url,
+              color: $color,
+              fields: [
+                {name:"Repository",          value:$repo,      inline:true},
+                {name:"Package Ecosystem",   value:$ecosystem, inline:true},
+                {name:"Dependency",          value:$dep,       inline:false},
+                {name:"Previous Version",    value:$prev,      inline:true},
+                {name:"New Version",         value:$next,      inline:true},
+                {name:"Update Type",         value:$utype,     inline:true},
+                {name:"Compatibility Score", value:$compat,    inline:true},
+                {name:"Pull Request",        value:$pr_link,   inline:false}
               ],
-              "footer": {"text": "Dependabot | Automated Dependency Update"},
-          }]}
+              footer: {text: "Dependabot | Automated Dependency Update"}
+            }]}')
 
-          try:
-              req = urllib.request.Request(
-                  os.environ["WEBHOOK_URL"],
-                  data=json.dumps(payload).encode(),
-                  headers={"Content-Type": "application/json"},
-                  method="POST",
-              )
-              with urllib.request.urlopen(req): pass
-          except Exception as e:
-              print(f"Discord webhook failed: {e}")
+          curl -fsSL -X POST "$WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -d "$PAYLOAD"
