@@ -21,25 +21,19 @@
   "build": {
     "appId": "com.thebois.overlay",
     "productName": "THEBOIS Overlay",
-    "files": [
-      "out/**/*"
-    ],
+    "files": ["out/**/*"],
     "extraResources": [
       {
         "from": "resources/",
         "to": "resources/",
-        "filter": [
-          "**/*"
-        ]
+        "filter": ["**/*"]
       }
     ],
     "win": {
       "target": [
         {
           "target": "nsis",
-          "arch": [
-            "x64"
-          ]
+          "arch": ["x64"]
         }
       ],
       "icon": "resources/icon.ico"
@@ -65,28 +59,28 @@
     }
   },
   "dependencies": {
-    "@electron-toolkit/preload": "latest",
-    "@electron-toolkit/utils": "latest",
-    "@logdna/tail-file": "latest",
-    "axios": "latest",
-    "discord-rpc": "latest",
-    "electron-updater": "latest",
-    "electron-window-state": "latest",
-    "pinia": "latest",
-    "pinia-plugin-persistedstate": "latest",
-    "vue": "latest",
-    "vue-router": "latest"
+    "@electron-toolkit/preload": "^3.0.1",
+    "@electron-toolkit/utils": "^3.0.0",
+    "@logdna/tail-file": "^2.2.0",
+    "axios": "^1.7.7",
+    "discord-rpc": "^4.0.1",
+    "electron-updater": "^6.3.9",
+    "electron-window-state": "^5.0.3",
+    "pinia": "^2.1.7",
+    "pinia-plugin-persistedstate": "^4.1.1",
+    "vue": "^3.5.13",
+    "vue-router": "^4.4.5"
   },
   "devDependencies": {
-    "@electron-toolkit/tsconfig": "latest",
-    "@tailwindcss/vite": "latest",
-    "@types/node": "latest",
-    "@vitejs/plugin-vue": "latest",
-    "@vue/tsconfig": "latest",
+    "@electron-toolkit/tsconfig": "^1.0.1",
+    "@tailwindcss/vite": "^4.0.0",
+    "@types/node": "^22.7.4",
+    "@vitejs/plugin-vue": "^5.1.4",
+    "@vue/tsconfig": "^0.5.1",
     "conventional-changelog-conventionalcommits": "^9.3.1",
-    "electron": "latest",
-    "electron-builder": "latest",
-    "electron-vite": "latest",
+    "electron": "^31.0.2",
+    "electron-builder": "^25.1.8",
+    "electron-vite": "^2.3.0",
     "eslint": "^10.1.0",
     "eslint-config-prettier": "^10.0.0",
     "eslint-plugin-vue": "^10.8.0",
@@ -96,14 +90,12 @@
     "@semantic-release/commit-analyzer": "^13.0.0",
     "@semantic-release/git": "^10.0.0",
     "@semantic-release/github": "^12.0.6",
-    "@semantic-release/npm": "^12.0.0",
-    "@semantic-release/github": "^10.0.0",
     "@semantic-release/npm": "^13.1.5",
     "@semantic-release/release-notes-generator": "^14.0.0",
-    "tailwindcss": "latest",
-    "typescript": "latest",
+    "tailwindcss": "^4.0.0",
+    "typescript": "^5.6.3",
     "typescript-eslint": "^8.0.0",
     "vue-eslint-parser": "^10.4.0",
-    "vue-tsc": "latest"
+    "vue-tsc": "^2.1.6"
   }
 }
