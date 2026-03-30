@@ -56,13 +56,14 @@
       "oneClick": true,
       "perMachine": false
     },
-    "publish": {
-      "provider": "github",
-      "owner": "THEBOIS-Dev",
-      "repo": "THEBOIS-Overlay",
-      "releaseType": "release",
-      "draft": false
-    }
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "THEBOIS-Dev",
+        "repo": "THEBOIS-Overlay",
+        "releaseType": "release"
+      }
+    ]
   },
   "dependencies": {
     "@electron-toolkit/preload": "^3.0.1",
