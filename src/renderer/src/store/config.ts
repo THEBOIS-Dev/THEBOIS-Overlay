@@ -118,12 +118,23 @@ export interface ConfigState {
 
 const DEFAULT_COLUMNS: Column[] = [
   Column.NAME,
+  Column.WINS,
+  Column.KILLS,
+  Column.FINAL_KILLS,
   Column.FKDR,
   Column.WLR,
-  Column.FINAL_KILLS,
-  Column.KDR,
   Column.WIN_STREAK,
 ]
+
+interface Api {
+  app: {
+    getPath: (name: string) => Promise<string>
+  }
+  fs: {
+    readdir: (path: string) => Promise<string[]>
+    stat: (path: string) => Promise<{ isFile: () => boolean; mtimeMs: number }>
+  }
+}
 
 export const useConfigStore = defineStore('config', {
   state: (): ConfigState => ({
@@ -187,13 +198,14 @@ export const useConfigStore = defineStore('config', {
         `${home}/.lunarclient/profiles/lunar`
       ]
       const logFiles: { path: string; mtime: number }[] = []
+      const api = window.api as unknown as Api
       for (const base of candidates) {
         try {
-          const versions = await (window.api as any).fs.readdir(base)
+          const versions = await api.fs.readdir(base)
           for (const version of versions) {
             const logPath = `${base}/${version}/logs/latest.log`
             try {
-              const stats = await (window.api as any).fs.stat(logPath)
+              const stats = await api.fs.stat(logPath)
               if (stats.isFile()) {
                 logFiles.push({ path: logPath, mtime: stats.mtimeMs })
               }
