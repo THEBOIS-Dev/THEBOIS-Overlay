@@ -9,10 +9,10 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 permissions:
-  contents:      write
-  issues:        write
+  contents: write
+  issues: write
   pull-requests: write
-  id-token:      write
+  id-token: write
 
 jobs:
   get-version:
@@ -81,7 +81,7 @@ jobs:
 
       - name: Package macOS DMG
         env:
-          CSC_LINK:         ${{ secrets.MAC_CSC_LINK }}
+          CSC_LINK: ${{ secrets.MAC_CSC_LINK }}
           CSC_KEY_PASSWORD: ${{ secrets.MAC_CSC_KEY_PASSWORD }}
         run: npx electron-builder --mac --publish never
 
@@ -96,10 +96,7 @@ jobs:
   build-linux:
     name: Build — Linux (AppImage)
     runs-on: ubuntu-latest
-<<<<<<< HEAD
-=======
     needs: get-version
->>>>>>> 0a63789 (fix(update): auto update & webhook)
 
     steps:
       - uses: actions/checkout@v5
@@ -133,11 +130,7 @@ jobs:
   create-release:
     name: Create Release
     runs-on: ubuntu-latest
-<<<<<<< HEAD
-    needs: [build-windows, build-macos, build-linux]
-=======
     needs: [get-version, build-windows, build-macos, build-linux]
->>>>>>> 0a63789 (fix(update): auto update & webhook)
     if: always() && (needs.build-windows.result == 'success' || needs.build-macos.result == 'success' || needs.build-linux.result == 'success')
     outputs:
       tag: ${{ steps.tag.outputs.tag }}
@@ -158,35 +151,22 @@ jobs:
           mkdir -p release-assets
           find artifacts -type f -exec cp {} release-assets/ \;
 
-<<<<<<< HEAD
-      - name: Create release tag
-        id: tag
-        run: |
-          TAG="build-${GITHUB_RUN_NUMBER}"
-=======
       - name: Set semver tag
         id: tag
         run: |
           TAG="v${{ needs.get-version.outputs.version }}"
->>>>>>> 0a63789 (fix(update): auto update & webhook)
           echo "tag=$TAG" >> $GITHUB_OUTPUT
 
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-<<<<<<< HEAD
-          gh release create "${{ steps.tag.outputs.tag }}" \
-            --title "Build ${{ github.run_number }} (${{ github.sha }})" \
-            --notes "Auto-generated build from commit ${{ github.sha }}" \
-=======
           TAG="${{ steps.tag.outputs.tag }}"
           VERSION="${{ needs.get-version.outputs.version }}"
           gh release delete "$TAG" --yes 2>/dev/null || true
           gh release create "$TAG" \
             --title "v${VERSION}" \
             --notes "Release v${VERSION} — built from commit ${{ github.sha }}" \
->>>>>>> 0a63789 (fix(update): auto update & webhook)
             --target ${{ github.sha }}
 
       - name: Upload assets to release
@@ -205,18 +185,15 @@ jobs:
       - name: Post to Discord
         continue-on-error: true
         env:
-          WEBHOOK_URL:  ${{ secrets.DISCORD_WEBHOOK_RELEASES }}
-          REPO:         ${{ github.repository }}
-          RUN_ID:       ${{ github.run_id }}
-          RUN_NUMBER:   ${{ github.run_number }}
-          WORKFLOW:     ${{ github.workflow }}
-<<<<<<< HEAD
-=======
-          SHA:          ${{ github.sha }}
->>>>>>> 0a63789 (fix(update): auto update & webhook)
-          TAG:          ${{ needs.create-release.outputs.tag }}
-          WIN_RESULT:   ${{ needs.build-windows.result }}
-          MAC_RESULT:   ${{ needs.build-macos.result }}
+          WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_RELEASES }}
+          REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_NUMBER: ${{ github.run_number }}
+          WORKFLOW: ${{ github.workflow }}
+          SHA: ${{ github.sha }}
+          TAG: ${{ needs.create-release.outputs.tag }}
+          WIN_RESULT: ${{ needs.build-windows.result }}
+          MAC_RESULT: ${{ needs.build-macos.result }}
           LINUX_RESULT: ${{ needs.build-linux.result }}
         run: |
           [ -z "$WEBHOOK_URL" ] && echo "DISCORD_WEBHOOK_RELEASES secret not set, skipping" && exit 0
@@ -235,16 +212,6 @@ jobs:
           LINUX_BADGE=$(badge "$LINUX_RESULT")
 
           if [ "$WIN_RESULT" = "success" ] && [ "$MAC_RESULT" = "success" ] && [ "$LINUX_RESULT" = "success" ]; then
-<<<<<<< HEAD
-            COLOR=3066993
-            STATUS="All builds succeeded"
-          elif [ "$WIN_RESULT" = "failure" ] || [ "$MAC_RESULT" = "failure" ] || [ "$LINUX_RESULT" = "failure" ]; then
-            COLOR=15158332
-            STATUS="Some builds failed"
-          else
-            COLOR=16776960
-            STATUS="🔄 Build completed"
-=======
             COLOR=5763719
             STATUS="All builds succeeded"
           elif [ "$WIN_RESULT" = "failure" ] || [ "$MAC_RESULT" = "failure" ] || [ "$LINUX_RESULT" = "failure" ]; then
@@ -253,18 +220,13 @@ jobs:
           else
             COLOR=16705372
             STATUS="Build completed"
->>>>>>> 0a63789 (fix(update): auto update & webhook)
           fi
 
           DESC="**Release:** \`${TAG}\`"$'\n'"**Commit:** \`${SHA:0:7}\`"
 
           PAYLOAD=$(jq -nc \
             --arg title "Build ${RUN_NUMBER} — ${STATUS}" \
-<<<<<<< HEAD
-            --arg desc "Release created: \`${TAG}\`\nCommit: \`${GITHUB_SHA::7}\`" \
-=======
             --arg desc "$DESC" \
->>>>>>> 0a63789 (fix(update): auto update & webhook)
             --argjson color "$COLOR" \
             --arg win "$WIN_BADGE" \
             --arg mac "$MAC_BADGE" \
@@ -276,17 +238,10 @@ jobs:
               description: $desc,
               color: $color,
               fields: [
-<<<<<<< HEAD
-                {name:"Windows", value:$win, inline:true},
-                {name:"macOS",   value:$mac, inline:true},
-                {name:"Linux",   value:$linux, inline:true},
-                {name:"Logs",    value:$logs, inline:false}
-=======
                 {name:"Windows", value:$win,   inline:true},
                 {name:"macOS",   value:$mac,   inline:true},
                 {name:"Linux",   value:$linux, inline:true},
                 {name:"Logs",    value:$logs,  inline:false}
->>>>>>> 0a63789 (fix(update): auto update & webhook)
               ],
               footer: {text: $footer}
             }]}')
