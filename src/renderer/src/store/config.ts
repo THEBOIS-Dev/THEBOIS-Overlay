@@ -180,16 +180,47 @@ export const useConfigStore = defineStore('config', {
       this.theme = { ...DEFAULT_THEME, colors: { ...DEFAULT_THEME_COLORS } }
     },
 
+    async findLunarLogPath(): Promise<string> {
+      const home = await window.api.app.getPath('home')
+      const candidates = [
+        `${home}/.lunarclient/offline`,
+        `${home}/.lunarclient/profiles/lunar`
+      ]
+      const logFiles: { path: string; mtime: number }[] = []
+      for (const base of candidates) {
+        try {
+          const versions = await (window.api as any).fs.readdir(base)
+          for (const version of versions) {
+            const logPath = `${base}/${version}/logs/latest.log`
+            try {
+              const stats = await (window.api as any).fs.stat(logPath)
+              if (stats.isFile()) {
+                logFiles.push({ path: logPath, mtime: stats.mtimeMs })
+              }
+            } catch {}
+          }
+        } catch {}
+      }
+      if (logFiles.length === 0) {
+        return `${home}/.lunarclient/offline/multiver/logs/latest.log`
+      }
+      logFiles.sort((a, b) => b.mtime - a.mtime)
+      return logFiles[0].path
+    },
+
     async setLogFilePathFromPreset(preset: LogFilePreset): Promise<void> {
       this.logFilePathPreset = preset
       if (preset === 'CUSTOM') return
+      if (preset === 'LUNAR_CLIENT') {
+        this.logFilePath = await this.findLunarLogPath()
+        return
+      }
       const appData = await window.api.app.getPath('appData')
-      const home = await window.api.app.getPath('home')
       const paths: Record<Exclude<LogFilePreset, 'CUSTOM'>, string> = {
         STANDARD: `${appData}/.minecraft/logs/latest.log`,
         TLAUNCHER: `${appData}/.minecraft/logs/latest.log`,
-        BADLION_CLIENT: `${appData}/.minecraft/logs/latest.log`,
-        LUNAR_CLIENT: `${home}/.lunarclient/offline/multiver/logs/latest.log`,
+        BADLION_CLIENT: `${appData}/.minecraft/logs/blclient/minecraft/latest.log`,
+        LUNAR_CLIENT: '',
         SILENT_CLIENT: `${appData}/.mc/logs/latest.log`,
         FEATHER_CLIENT: `${appData}/.minecraft/feather/logs/latest.log`,
         CM_CLIENT: `${appData}/.cmclient/logs/latest.log`,

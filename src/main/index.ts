@@ -290,7 +290,7 @@ type PikaFetchResult = {
 ipcMain.handle(
   'pika:fetch',
   (_, username: string, interval = 'total', mode = 'ALL_MODES'): Promise<PikaFetchResult> => {
-    const key = `pika:${username}:${interval}:${mode}`
+    const key = `pika:${username.toLowerCase()}:${interval}:${mode}`
     dbg.ipc(`pika:fetch  user="${username}"  interval=${interval}  mode=${mode}`)
 
     const cached = cache.get<PikaFetchResult>(key)
@@ -300,28 +300,47 @@ ipcMain.handle(
       const cached2 = cache.get<PikaFetchResult>(key)
       if (cached2) return cached2
 
-      const enc = encodeURIComponent(username)
-      const profileUrl = `${PIKA_BASE}/profile/${enc}`
-      const statsUrl = `${PIKA_BASE}/profile/${enc}/leaderboard?type=bedwars&interval=${interval}&mode=${mode}`
+      const profileUrl = `${PIKA_BASE}/profile/${encodeURIComponent(username)}`
+      dbg.http(`pika:fetch profile request for "${username}"`)
 
-      dbg.http(`pika:fetch firing 2 parallel requests for "${username}"`)
-      const [pRes, sRes] = await Promise.allSettled([pikaGet(profileUrl), pikaGet(statsUrl)])
+      const pRes = await pikaGet(profileUrl).catch((err) => {
+        dbg.error(`pika:fetch profile "${username}" — ${(err as Error).message}`)
+        return null
+      })
 
-      const profile =
-        pRes.status === 'fulfilled' && pRes.value.status === 200 ? pRes.value.data : null
-      const stats =
-        sRes.status === 'fulfilled' && sRes.value.status === 200 ? sRes.value.data : null
       const notFound =
-        pRes.status === 'fulfilled' && (pRes.value.status === 404 || pRes.value.status === 400)
-      const rateLimit = pRes.status === 'fulfilled' && pRes.value.status === 429
+        pRes !== null && (pRes.status === 404 || pRes.status === 400)
+      const rateLimit = pRes !== null && pRes.status === 429
 
-      if (notFound) dbg.ipc(`pika:fetch "${username}" → NOT FOUND`)
-      if (rateLimit) dbg.ipc(`pika:fetch "${username}" → RATE LIMITED`)
-      if (!notFound && !rateLimit) {
-        dbg.ipc(`pika:fetch "${username}" → OK  profile=${!!profile}  stats=${!!stats}`)
+      if (notFound) {
+        dbg.ipc(`pika:fetch "${username}" → NOT FOUND`)
+        const result: PikaFetchResult = { profile: null, stats: null, notFound: true, rateLimit: false }
+        cache.set(key, result)
+        return result
       }
 
-      const result: PikaFetchResult = { profile, stats, notFound, rateLimit }
+      if (rateLimit) {
+        dbg.ipc(`pika:fetch "${username}" → RATE LIMITED`)
+        return { profile: null, stats: null, notFound: false, rateLimit: true }
+      }
+
+      const profile = pRes?.status === 200 ? pRes.data : null
+      const canonicalUsername =
+        (profile as { username?: string } | null)?.username ?? username
+
+      dbg.http(`pika:fetch stats request for canonical="${canonicalUsername}"`)
+      const statsUrl = `${PIKA_BASE}/profile/${encodeURIComponent(canonicalUsername)}/leaderboard?type=bedwars&interval=${interval}&mode=${mode}`
+
+      const sRes = await pikaGet(statsUrl).catch((err) => {
+        dbg.error(`pika:fetch stats "${canonicalUsername}" — ${(err as Error).message}`)
+        return null
+      })
+
+      const stats = sRes?.status === 200 ? sRes.data : null
+
+      dbg.ipc(`pika:fetch "${canonicalUsername}" → OK  profile=${!!profile}  stats=${!!stats}`)
+
+      const result: PikaFetchResult = { profile, stats, notFound: false, rateLimit: false }
       cache.set(key, result)
       return result
     })
@@ -331,7 +350,7 @@ ipcMain.handle(
 ipcMain.handle(
   'pika:stats',
   (_, username: string, interval: string, mode: string): Promise<unknown> => {
-    const key = `pika:stats:${username}:${interval}:${mode}`
+    const key = `pika:stats:${username.toLowerCase()}:${interval}:${mode}`
     dbg.ipc(`pika:stats  user="${username}"  interval=${interval}  mode=${mode}`)
 
     const cached = cache.get<unknown>(key)
@@ -341,13 +360,27 @@ ipcMain.handle(
       const cached2 = cache.get<unknown>(key)
       if (cached2) return cached2
 
-      const enc = encodeURIComponent(username)
-      const url = `${PIKA_BASE}/profile/${enc}/leaderboard?type=bedwars&interval=${interval}&mode=${mode}`
-      const res = await pikaGet(url).catch((err) => {
-        dbg.error(`pika:stats "${username}" — ${(err as Error).message}`)
+      const profileUrl = `${PIKA_BASE}/profile/${encodeURIComponent(username)}`
+      dbg.http(`pika:stats profile request for "${username}"`)
+
+      const pRes = await pikaGet(profileUrl).catch((err) => {
+        dbg.error(`pika:stats profile "${username}" — ${(err as Error).message}`)
         return null
       })
-      const data = res?.status === 200 ? res.data : null
+
+      const profile = pRes?.status === 200 ? pRes.data : null
+      const canonicalUsername =
+        (profile as { username?: string } | null)?.username ?? username
+
+      dbg.http(`pika:stats stats request for canonical="${canonicalUsername}"`)
+      const statsUrl = `${PIKA_BASE}/profile/${encodeURIComponent(canonicalUsername)}/leaderboard?type=bedwars&interval=${interval}&mode=${mode}`
+
+      const sRes = await pikaGet(statsUrl).catch((err) => {
+        dbg.error(`pika:stats "${canonicalUsername}" — ${(err as Error).message}`)
+        return null
+      })
+
+      const data = sRes?.status === 200 ? sRes.data : null
       if (data) cache.set(key, data)
       return data
     })
