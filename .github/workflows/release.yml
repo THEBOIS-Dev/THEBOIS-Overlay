@@ -2,39 +2,118 @@ name: Release
 
 on:
   push:
-    branches:
-      - main
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 permissions:
-  contents: write
-  issues: write
+  contents:      write
+  issues:        write
   pull-requests: write
-  id-token: write
+  id-token:      write
 
 jobs:
-  get-version:
-    name: Read version
+  semantic-release:
+    name: Semantic Release
     runs-on: ubuntu-latest
     outputs:
-      version: ${{ steps.ver.outputs.version }}
+      new_release_published: ${{ steps.release.outputs.new_release_published }}
+      new_release_version:   ${{ steps.release.outputs.new_release_version }}
+      new_release_git_tag:   ${{ steps.release.outputs.new_release_git_tag }}
+
     steps:
-      - uses: actions/checkout@v5
-      - name: Extract version
-        id: ver
-        run: echo "version=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Run semantic-release
+        id: release
+        env:
+          GITHUB_TOKEN:        ${{ secrets.GITHUB_TOKEN }}
+          GIT_AUTHOR_NAME:     github-actions[bot]
+          GIT_AUTHOR_EMAIL:    github-actions[bot]@users.noreply.github.com
+          GIT_COMMITTER_NAME:  github-actions[bot]
+          GIT_COMMITTER_EMAIL: github-actions[bot]@users.noreply.github.com
+        run: |
+          npx semantic-release | tee output.txt
+
+          if grep -q "Published release" output.txt; then
+            echo "new_release_published=true" >> $GITHUB_OUTPUT
+          else
+            echo "new_release_published=false" >> $GITHUB_OUTPUT
+          fi
+
+          TAG=$(git describe --tags --abbrev=0)
+          echo "new_release_git_tag=$TAG" >> $GITHUB_OUTPUT
+
+          VERSION="${TAG#v}"
+          echo "new_release_version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Notify Discord — semantic-release failure
+        if: failure()
+        continue-on-error: true
+        env:
+          WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_CI }}
+          REPO:        ${{ github.repository }}
+          BRANCH:      ${{ github.ref_name }}
+          ACTOR:       ${{ github.actor }}
+          RUN_ID:      ${{ github.run_id }}
+          RUN_NUMBER:  ${{ github.run_number }}
+          WORKFLOW:    ${{ github.workflow }}
+          SHA:         ${{ github.sha }}
+        run: |
+          [ -z "$WEBHOOK_URL" ] && echo "DISCORD_WEBHOOK_CI secret not set, skipping" && exit 0
+
+          PAYLOAD=$(jq -nc \
+            --arg title "Release Pipeline — semantic-release Failed" \
+            --arg desc "Version determination failed for **${REPO}**. No release was created." \
+            --arg repo "https://github.com/${REPO}" \
+            --arg branch "$BRANCH" \
+            --arg actor "$ACTOR" \
+            --arg sha "${SHA:0:7}" \
+            --arg run_url "https://github.com/${REPO}/actions/runs/${RUN_ID}" \
+            --arg footer "${WORKFLOW} | Run #${RUN_NUMBER}" \
+            '{embeds:[{
+              title: $title,
+              description: $desc,
+              color: 15158332,
+              fields: [
+                {name:"Repository",   value:$repo,    inline:true},
+                {name:"Branch",       value:$branch,  inline:true},
+                {name:"Triggered By", value:$actor,   inline:true},
+                {name:"Commit",       value:$sha,     inline:true},
+                {name:"Workflow Run", value:$run_url, inline:false}
+              ],
+              footer: {text: $footer}
+            }]}')
+
+          HTTP=$(curl -sS -o /dev/stderr -w "%{http_code}" \
+            -X POST "$WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -d "$PAYLOAD")
+          echo "Discord responded: HTTP $HTTP"
 
   build-windows:
     name: Build — Windows (x64)
     runs-on: windows-latest
-    needs: get-version
+    needs: semantic-release
+    if: needs.semantic-release.outputs.new_release_published == 'true'
 
     steps:
       - uses: actions/checkout@v5
         with:
-          fetch-depth: 0
+          ref: ${{ needs.semantic-release.outputs.new_release_git_tag }}
 
       - uses: actions/setup-node@v5
         with:
@@ -50,23 +129,24 @@ jobs:
       - name: Package Windows installer
         run: npx electron-builder --win --publish never
 
-      - name: Upload Windows artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: windows-artifacts
-          path: |
-            dist/*.exe
-            dist/latest.yml
+      - name: Upload installer to release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG:      ${{ needs.semantic-release.outputs.new_release_git_tag }}
+        run: |
+          gh release upload "$TAG" dist/*.exe dist/latest.yml --clobber
 
   build-macos:
     name: Build — macOS (universal)
     runs-on: macos-latest
-    needs: get-version
+    needs: semantic-release
+    if: needs.semantic-release.outputs.new_release_published == 'true'
 
     steps:
       - uses: actions/checkout@v5
         with:
-          fetch-depth: 0
+          ref: ${{ needs.semantic-release.outputs.new_release_git_tag }}
 
       - uses: actions/setup-node@v5
         with:
@@ -81,27 +161,27 @@ jobs:
 
       - name: Package macOS DMG
         env:
-          CSC_LINK: ${{ secrets.MAC_CSC_LINK }}
+          CSC_LINK:         ${{ secrets.MAC_CSC_LINK }}
           CSC_KEY_PASSWORD: ${{ secrets.MAC_CSC_KEY_PASSWORD }}
         run: npx electron-builder --mac --publish never
 
-      - name: Upload macOS artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: macos-artifacts
-          path: |
-            dist/*.dmg
-            dist/latest-mac.yml
+      - name: Upload DMG to release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG:      ${{ needs.semantic-release.outputs.new_release_git_tag }}
+        run: |
+          gh release upload "$TAG" dist/*.dmg dist/latest-mac.yml --clobber
 
   build-linux:
     name: Build — Linux (AppImage)
     runs-on: ubuntu-latest
-    needs: get-version
+    needs: semantic-release
+    if: needs.semantic-release.outputs.new_release_published == 'true'
 
     steps:
       - uses: actions/checkout@v5
         with:
-          fetch-depth: 0
+          ref: ${{ needs.semantic-release.outputs.new_release_git_tag }}
 
       - uses: actions/setup-node@v5
         with:
@@ -119,89 +199,41 @@ jobs:
       - name: Package Linux AppImage
         run: npx electron-builder --linux --publish never
 
-      - name: Upload Linux artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: linux-artifacts
-          path: |
-            dist/*.AppImage
-            dist/latest-linux.yml
-
-  create-release:
-    name: Create Release
-    runs-on: ubuntu-latest
-    needs: [get-version, build-windows, build-macos, build-linux]
-    if: always() && (needs.build-windows.result == 'success' || needs.build-macos.result == 'success' || needs.build-linux.result == 'success')
-    outputs:
-      tag: ${{ steps.tag.outputs.tag }}
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v5
-        with:
-          fetch-depth: 0
-
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: artifacts
-
-      - name: Prepare release assets
-        run: |
-          mkdir -p release-assets
-          find artifacts -type f -exec cp {} release-assets/ \;
-
-      - name: Set semver tag
-        id: tag
-        run: |
-          TAG="v${{ needs.get-version.outputs.version }}"
-          echo "tag=$TAG" >> $GITHUB_OUTPUT
-
-      - name: Create GitHub Release
+      - name: Upload AppImage to release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG:      ${{ needs.semantic-release.outputs.new_release_git_tag }}
         run: |
-          TAG="${{ steps.tag.outputs.tag }}"
-          VERSION="${{ needs.get-version.outputs.version }}"
-          gh release delete "$TAG" --yes 2>/dev/null || true
-          gh release create "$TAG" \
-            --title "v${VERSION}" \
-            --notes "Release v${VERSION} — built from commit ${{ github.sha }}" \
-            --target ${{ github.sha }}
-
-      - name: Upload assets to release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh release upload "${{ steps.tag.outputs.tag }}" release-assets/* --clobber
+          gh release upload "$TAG" dist/*.AppImage dist/latest-linux.yml --clobber
 
   notify:
-    name: Notify Discord — Build Summary
+    name: Notify Discord — Release Summary
     runs-on: ubuntu-latest
-    needs: [create-release, build-windows, build-macos, build-linux]
-    if: always()
+    needs: [semantic-release, build-windows, build-macos, build-linux]
+    if: always() && needs.semantic-release.outputs.new_release_published == 'true'
 
     steps:
       - name: Post to Discord
         continue-on-error: true
         env:
-          WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_RELEASES }}
-          REPO: ${{ github.repository }}
-          RUN_ID: ${{ github.run_id }}
-          RUN_NUMBER: ${{ github.run_number }}
-          WORKFLOW: ${{ github.workflow }}
-          SHA: ${{ github.sha }}
-          TAG: ${{ needs.create-release.outputs.tag }}
-          WIN_RESULT: ${{ needs.build-windows.result }}
-          MAC_RESULT: ${{ needs.build-macos.result }}
+          WEBHOOK_URL:  ${{ secrets.DISCORD_WEBHOOK_RELEASES }}
+          REPO:         ${{ github.repository }}
+          ACTOR:        ${{ github.actor }}
+          RUN_ID:       ${{ github.run_id }}
+          RUN_NUMBER:   ${{ github.run_number }}
+          WORKFLOW:     ${{ github.workflow }}
+          VERSION:      ${{ needs.semantic-release.outputs.new_release_version }}
+          TAG:          ${{ needs.semantic-release.outputs.new_release_git_tag }}
+          WIN_RESULT:   ${{ needs.build-windows.result }}
+          MAC_RESULT:   ${{ needs.build-macos.result }}
           LINUX_RESULT: ${{ needs.build-linux.result }}
         run: |
           [ -z "$WEBHOOK_URL" ] && echo "DISCORD_WEBHOOK_RELEASES secret not set, skipping" && exit 0
 
           badge() {
             case "$1" in
-              success)   echo "Pass"   ;;
-              failure)   echo "Failed" ;;
+              success)   echo "Pass"      ;;
+              failure)   echo "Failed"    ;;
               cancelled) echo "Cancelled" ;;
               *)         echo "Skipped"   ;;
             esac
@@ -212,22 +244,22 @@ jobs:
           LINUX_BADGE=$(badge "$LINUX_RESULT")
 
           if [ "$WIN_RESULT" = "success" ] && [ "$MAC_RESULT" = "success" ] && [ "$LINUX_RESULT" = "success" ]; then
-            COLOR=5763719
-            STATUS="All builds succeeded"
+            COLOR=3066993
+            LABEL="All Platforms Built Successfully"
           elif [ "$WIN_RESULT" = "failure" ] || [ "$MAC_RESULT" = "failure" ] || [ "$LINUX_RESULT" = "failure" ]; then
-            COLOR=15548997
-            STATUS="Some builds failed"
+            COLOR=15158332
+            LABEL="Build Completed with Failures"
           else
-            COLOR=16705372
-            STATUS="Build completed"
+            COLOR=16776960
+            LABEL="Build Completed"
           fi
 
-          DESC="**Release:** \`${TAG}\`"$'\n'"**Commit:** \`${SHA:0:7}\`"
-
           PAYLOAD=$(jq -nc \
-            --arg title "Build ${RUN_NUMBER} — ${STATUS}" \
-            --arg desc "$DESC" \
+            --arg title "Release ${TAG} — ${LABEL}" \
+            --arg desc "${VERSION} has been published. https://github.com/${REPO}/releases/tag/${TAG}" \
             --argjson color "$COLOR" \
+            --arg version "$VERSION" \
+            --arg tag "$TAG" \
             --arg win "$WIN_BADGE" \
             --arg mac "$MAC_BADGE" \
             --arg linux "$LINUX_BADGE" \
@@ -238,10 +270,12 @@ jobs:
               description: $desc,
               color: $color,
               fields: [
-                {name:"Windows", value:$win,   inline:true},
-                {name:"macOS",   value:$mac,   inline:true},
-                {name:"Linux",   value:$linux, inline:true},
-                {name:"Logs",    value:$logs,  inline:false}
+                {name:"Version", value:$version, inline:true},
+                {name:"Tag",     value:$tag,     inline:true},
+                {name:"Windows", value:$win,     inline:true},
+                {name:"macOS",   value:$mac,     inline:true},
+                {name:"Linux",   value:$linux,   inline:true},
+                {name:"Logs",    value:$logs,    inline:false}
               ],
               footer: {text: $footer}
             }]}')
