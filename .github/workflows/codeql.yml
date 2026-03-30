@@ -62,9 +62,11 @@ jobs:
             STATUS="Failed"
           fi
 
+          desc=$(printf "**Branch:** \`%s\`\n**Commit:** \`%s\`\n**Event:** %s" "$BRANCH" "${SHA:0:7}" "$EVENT")
+
           PAYLOAD=$(jq -nc \
             --arg title "CodeQL — ${STATUS}" \
-            --arg desc $'**Branch:** `'"${BRANCH}"$'\n**Commit:** `'"${SHA:0:7}"$'\n**Event:** '"${EVENT}" \
+            --arg desc "$desc" \
             --arg result "$SCAN_RESULT" \
             --arg alerts "https://github.com/${REPO}/security/code-scanning" \
             --arg logs "https://github.com/${REPO}/actions/runs/${RUN_ID}" \
