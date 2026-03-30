@@ -103,7 +103,7 @@
     "@semantic-release/npm": "^13.1.5",
     "@semantic-release/release-notes-generator": "^14.0.0",
     "tailwindcss": "^4.0.0",
-    "typescript": "^6.0.2",
+    "typescript": "^5.9.3",
     "typescript-eslint": "^8.0.0",
     "vue-eslint-parser": "^10.4.0",
     "vue-tsc": "^2.1.6"
