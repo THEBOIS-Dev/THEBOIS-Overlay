@@ -61,6 +61,8 @@ jobs:
           WORKFLOW:    ${{ github.workflow }}
           SHA:         ${{ github.sha }}
         run: |
+          [ -z "$WEBHOOK_URL" ] && echo "DISCORD_WEBHOOK_CI secret not set, skipping" && exit 0
+
           PAYLOAD=$(jq -nc \
             --arg title "Release Pipeline — semantic-release Failed" \
             --arg desc "Version determination failed for **${REPO}**. No release was created." \
@@ -83,9 +85,12 @@ jobs:
               ],
               footer: {text: $footer}
             }]}')
-          curl -fsSL -X POST "$WEBHOOK_URL" \
+
+          HTTP=$(curl -sS -o /dev/stderr -w "%{http_code}" \
+            -X POST "$WEBHOOK_URL" \
             -H "Content-Type: application/json" \
-            -d "$PAYLOAD"
+            -d "$PAYLOAD")
+          echo "Discord responded: HTTP $HTTP"
 
   build-windows:
     name: Build — Windows (x64)
@@ -103,12 +108,19 @@ jobs:
           node-version: 24
           cache: npm
 
-      - run: npm install --no-audit --no-fund
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
 
-      - name: Build Windows installer
-        run: npm run build:win -- --publish never
+      - name: Compile (tsc + vite)
+        run: npm run build
 
-      - name: Upload artifacts to release
+      # Call electron-builder directly so --publish never is actually respected.
+      # "npm run build:win -- --publish never" does NOT forward the flag through
+      # the && in the npm script — electron-builder never sees it.
+      - name: Package Windows installer
+        run: npx electron-builder --win --publish never
+
+      - name: Upload installer to release
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -132,15 +144,19 @@ jobs:
           node-version: 24
           cache: npm
 
-      - run: npm install --no-audit --no-fund
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
 
-      - name: Build macOS installer
+      - name: Compile (tsc + vite)
+        run: npm run build
+
+      - name: Package macOS DMG
         env:
           CSC_LINK:         ${{ secrets.MAC_CSC_LINK }}
           CSC_KEY_PASSWORD: ${{ secrets.MAC_CSC_KEY_PASSWORD }}
-        run: npm run build:mac -- --publish never
+        run: npx electron-builder --mac --publish never
 
-      - name: Upload artifacts to release
+      - name: Upload DMG to release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG:      ${{ needs.semantic-release.outputs.new_release_git_tag }}
@@ -163,14 +179,18 @@ jobs:
           node-version: 24
           cache: npm
 
-      - run: npm install --no-audit --no-fund
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
 
       - run: sudo apt-get update && sudo apt-get install -y libarchive-tools
 
-      - name: Build Linux AppImage
-        run: npm run build:linux -- --publish never
+      - name: Compile (tsc + vite)
+        run: npm run build
 
-      - name: Upload artifacts to release
+      - name: Package Linux AppImage
+        run: npx electron-builder --linux --publish never
+
+      - name: Upload AppImage to release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG:      ${{ needs.semantic-release.outputs.new_release_git_tag }}
@@ -199,12 +219,14 @@ jobs:
           MAC_RESULT:   ${{ needs.build-macos.result }}
           LINUX_RESULT: ${{ needs.build-linux.result }}
         run: |
+          [ -z "$WEBHOOK_URL" ] && echo "DISCORD_WEBHOOK_RELEASES secret not set, skipping" && exit 0
+
           badge() {
             case "$1" in
-              success)   echo "Pass" ;;
-              failure)   echo "Failed" ;;
+              success)   echo "Pass"      ;;
+              failure)   echo "Failed"    ;;
               cancelled) echo "Cancelled" ;;
-              *)         echo "Skipped" ;;
+              *)         echo "Skipped"   ;;
             esac
           }
 
@@ -249,6 +271,8 @@ jobs:
               footer: {text: $footer}
             }]}')
 
-          curl -fsSL -X POST "$WEBHOOK_URL" \
+          HTTP=$(curl -sS -o /dev/stderr -w "%{http_code}" \
+            -X POST "$WEBHOOK_URL" \
             -H "Content-Type: application/json" \
-            -d "$PAYLOAD"
+            -d "$PAYLOAD")
+          echo "Discord responded: HTTP $HTTP"

@@ -59,6 +59,8 @@ jobs:
           ESLINT:      ${{ steps.eslint.outcome }}
           TYPECHECK:   ${{ steps.typecheck.outcome }}
         run: |
+          [ -z "$WEBHOOK_URL" ] && echo "DISCORD_WEBHOOK_CI secret not set, skipping" && exit 0
+
           FAILED=""
           [ "$PRETTIER"  = "failure" ] && FAILED="${FAILED:+$FAILED, }Prettier"
           [ "$ESLINT"    = "failure" ] && FAILED="${FAILED:+$FAILED, }ESLint"
@@ -92,6 +94,8 @@ jobs:
               footer: {text: $footer}
             }]}')
 
-          curl -fsSL -X POST "$WEBHOOK_URL" \
+          HTTP=$(curl -sS -o /dev/stderr -w "%{http_code}" \
+            -X POST "$WEBHOOK_URL" \
             -H "Content-Type: application/json" \
-            -d "$PAYLOAD"
+            -d "$PAYLOAD")
+          echo "Discord responded: HTTP $HTTP"

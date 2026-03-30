@@ -39,6 +39,8 @@ jobs:
           NEW_VERSION:  ${{ steps.meta.outputs.new-version }}
           COMPAT_SCORE: ${{ steps.meta.outputs.compatibility-score }}
         run: |
+          [ -z "$WEBHOOK_URL" ] && echo "DISCORD_WEBHOOK_DEPENDABOT secret not set, skipping" && exit 0
+
           case "$UPDATE_TYPE" in
             version-update:semver-major) COLOR=15158332 ;;
             version-update:semver-minor) COLOR=16776960 ;;
@@ -80,6 +82,8 @@ jobs:
               footer: {text: "Dependabot | Automated Dependency Update"}
             }]}')
 
-          curl -fsSL -X POST "$WEBHOOK_URL" \
+          HTTP=$(curl -sS -o /dev/stderr -w "%{http_code}" \
+            -X POST "$WEBHOOK_URL" \
             -H "Content-Type: application/json" \
-            -d "$PAYLOAD"
+            -d "$PAYLOAD")
+          echo "Discord responded: HTTP $HTTP"
