@@ -612,9 +612,10 @@ autoUpdater.on('download-progress', (p) =>
     percent: Math.round(p.percent),
   }),
 )
-autoUpdater.on('update-downloaded', (info) =>
-  win?.webContents.send('updater:status', { status: 'downloaded', version: info.version }),
-)
+autoUpdater.on('update-downloaded', (info) => {
+  win?.webContents.send('updater:status', { status: 'downloaded', version: info.version })
+  setTimeout(() => autoUpdater.quitAndInstall(true, true), 3_000)
+})
 autoUpdater.on('error', (err) =>
   win?.webContents.send('updater:status', { status: 'error', error: err.message }),
 )
@@ -632,8 +633,8 @@ ipcMain.on('updater:check', () => {
 })
 
 ipcMain.on('updater:install', () => {
-  dbg.ipc('updater:install — quitting and installing')
-  autoUpdater.quitAndInstall()
+  dbg.ipc('updater:install — quitting and installing (silent)')
+  autoUpdater.quitAndInstall(true, true)
 })
 
 app.on('will-quit', () => {

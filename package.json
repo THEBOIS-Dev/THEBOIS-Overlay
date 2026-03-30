@@ -34,6 +34,7 @@
       }
     ],
     "win": {
+      "artifactName": "THEBOIS.Overlay.Setup.${version}.${ext}",
       "target": [
         {
           "target": "nsis",
