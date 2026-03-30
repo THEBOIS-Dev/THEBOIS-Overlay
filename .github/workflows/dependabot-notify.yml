@@ -44,7 +44,7 @@ jobs:
           case "$UPDATE_TYPE" in
             version-update:semver-major) COLOR=15158332 ;;
             version-update:semver-minor) COLOR=16776960 ;;
-            version-update:semver-patch) COLOR=3447003  ;;
+            version-update:semver-patch) COLOR=5763719  ;;
             *)                           COLOR=9807270  ;;
           esac
 
@@ -53,26 +53,24 @@ jobs:
 
           PAYLOAD=$(jq -nc \
             --arg title "Dependabot — PR #${PR_NUMBER} Opened" \
-            --arg desc "**${PR_TITLE}**" \
+            --arg desc "**${PR_TITLE}**\n**Repository:** ${REPO}" \
             --arg url "$PR_URL" \
             --argjson color "$COLOR" \
-            --arg repo "[${REPO}](https://github.com/${REPO})" \
             --arg ecosystem "\`${ECOSYSTEM:-unknown}\`" \
             --arg dep "\`${DEP_NAMES:-unknown}\`" \
             --arg prev "\`${PREV_VERSION:-—}\`" \
             --arg next "\`${NEW_VERSION:-—}\`" \
             --arg utype "\`${UPDATE_TYPE:-—}\`" \
             --arg compat "$COMPAT_DISPLAY" \
-            --arg pr_link "[View PR #${PR_NUMBER}](${PR_URL})" \
+            --arg pr_link "$PR_URL" \
             '{embeds:[{
               title: $title,
               description: $desc,
               url: $url,
               color: $color,
               fields: [
-                {name:"Repository",          value:$repo,      inline:true},
-                {name:"Package Ecosystem",   value:$ecosystem, inline:true},
-                {name:"Dependency",          value:$dep,       inline:false},
+                {name:"Ecosystem",           value:$ecosystem, inline:true},
+                {name:"Dependency",          value:$dep,       inline:true},
                 {name:"Previous Version",    value:$prev,      inline:true},
                 {name:"New Version",         value:$next,      inline:true},
                 {name:"Update Type",         value:$utype,     inline:true},

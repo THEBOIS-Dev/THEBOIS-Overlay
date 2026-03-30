@@ -42,7 +42,7 @@ jobs:
         id: typecheck
         run: npm run typecheck
 
-      - name: Notify Discord — failure
+      - name: Notify Discord
         if: failure()
         continue-on-error: true
         env:
@@ -61,6 +61,14 @@ jobs:
         run: |
           [ -z "$WEBHOOK_URL" ] && echo "DISCORD_WEBHOOK_CI secret not set, skipping" && exit 0
 
+          badge() {
+            case "$1" in
+              success) echo "Pass"   ;;
+              failure) echo "Failed" ;;
+              *)       echo "Skipped" ;;
+            esac
+          }
+
           FAILED=""
           [ "$PRETTIER"  = "failure" ] && FAILED="${FAILED:+$FAILED, }Prettier"
           [ "$ESLINT"    = "failure" ] && FAILED="${FAILED:+$FAILED, }ESLint"
@@ -68,28 +76,24 @@ jobs:
           [ -z "$FAILED" ] && FAILED="None"
 
           PAYLOAD=$(jq -nc \
-            --arg title "CI Pipeline — Quality Check Failed" \
-            --arg desc "Checks failed on ${BRANCH}" \
-            --arg repo "https://github.com/${REPO}" \
-            --arg branch "$BRANCH" \
+            --arg title "CI — Quality Check Failed" \
+            --arg desc "**Branch:** \`${BRANCH}\`\n**Commit:** \`${SHA:0:7}\`\n**Triggered by:** ${ACTOR}" \
+            --arg prettier "$(badge "$PRETTIER")" \
+            --arg eslint "$(badge "$ESLINT")" \
+            --arg typecheck "$(badge "$TYPECHECK")" \
             --arg event "$EVENT" \
-            --arg actor "$ACTOR" \
-            --arg sha "${SHA:0:7}" \
-            --arg failed "$FAILED" \
-            --arg run_url "https://github.com/${REPO}/actions/runs/${RUN_ID}" \
+            --arg logs "https://github.com/${REPO}/actions/runs/${RUN_ID}" \
             --arg footer "${WORKFLOW} | Run #${RUN_NUMBER}" \
             '{embeds:[{
               title: $title,
               description: $desc,
               color: 15158332,
               fields: [
-                {name:"Repository",   value:$repo,    inline:true},
-                {name:"Branch",       value:$branch,  inline:true},
-                {name:"Event",        value:$event,   inline:true},
-                {name:"Triggered By", value:$actor,   inline:true},
-                {name:"Commit",       value:$sha,     inline:true},
-                {name:"Failed Steps", value:$failed,  inline:false},
-                {name:"Workflow Run", value:$run_url, inline:false}
+                {name:"Prettier",    value:$prettier,  inline:true},
+                {name:"ESLint",      value:$eslint,    inline:true},
+                {name:"TypeScript",  value:$typecheck, inline:true},
+                {name:"Event",       value:$event,     inline:true},
+                {name:"Logs",        value:$logs,      inline:false}
               ],
               footer: {text: $footer}
             }]}')
