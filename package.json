@@ -1,6 +1,6 @@
 {
   "name": "thebois-overlay",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "description": "THEBOIS Overlay – PikaNetwork BedWars stat tracker",
   "private": true,
   "main": "./out/main/index.js",
@@ -21,19 +21,25 @@
   "build": {
     "appId": "com.thebois.overlay",
     "productName": "THEBOIS Overlay",
-    "files": ["out/**/*"],
+    "files": [
+      "out/**/*"
+    ],
     "extraResources": [
       {
         "from": "resources/",
         "to": "resources/",
-        "filter": ["**/*"]
+        "filter": [
+          "**/*"
+        ]
       }
     ],
     "win": {
       "target": [
         {
           "target": "nsis",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         }
       ],
       "icon": "resources/icon.ico"
