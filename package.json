@@ -79,13 +79,13 @@
     "pinia": "^3.0.4",
     "pinia-plugin-persistedstate": "^4.1.1",
     "vue": "^3.5.13",
-    "vue-router": "^4.4.5"
+    "vue-router": "^5.0.4"
   },
   "devDependencies": {
     "@electron-toolkit/tsconfig": "^1.0.1",
     "@tailwindcss/vite": "^4.0.0",
     "@types/node": "^22.7.4",
-    "@vitejs/plugin-vue": "^5.1.4",
+    "@vitejs/plugin-vue": "^6.0.5",
     "@vue/tsconfig": "^0.5.1",
     "conventional-changelog-conventionalcommits": "^9.3.1",
     "electron": "^31.0.2",
