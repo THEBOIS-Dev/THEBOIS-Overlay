@@ -118,6 +118,7 @@ export interface ConfigState {
 
 const DEFAULT_COLUMNS: Column[] = [
   Column.NAME,
+  Column.LEVEL,
   Column.WINS,
   Column.KILLS,
   Column.FINAL_KILLS,
