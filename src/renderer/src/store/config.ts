@@ -127,15 +127,7 @@ const DEFAULT_COLUMNS: Column[] = [
   Column.WIN_STREAK,
 ]
 
-interface Api {
-  app: {
-    getPath: (name: string) => Promise<string>
-  }
-  fs: {
-    readdir: (path: string) => Promise<string[]>
-    stat: (path: string) => Promise<{ isFile: () => boolean; mtimeMs: number }>
-  }
-}
+const VALID_COLUMNS = new Set<string>(Object.values(Column))
 
 export const useConfigStore = defineStore('config', {
   state: (): ConfigState => ({
@@ -193,32 +185,7 @@ export const useConfigStore = defineStore('config', {
     },
 
     async findLunarLogPath(): Promise<string> {
-      const home = await window.api.app.getPath('home')
-      const candidates = [
-        `${home}/.lunarclient/offline`,
-        `${home}/.lunarclient/profiles/lunar`
-      ]
-      const logFiles: { path: string; mtime: number }[] = []
-      const api = window.api as unknown as Api
-      for (const base of candidates) {
-        try {
-          const versions = await api.fs.readdir(base)
-          for (const version of versions) {
-            const logPath = `${base}/${version}/logs/latest.log`
-            try {
-              const stats = await api.fs.stat(logPath)
-              if (stats.isFile()) {
-                logFiles.push({ path: logPath, mtime: stats.mtimeMs })
-              }
-            } catch {}
-          }
-        } catch {}
-      }
-      if (logFiles.length === 0) {
-        return `${home}/.lunarclient/offline/multiver/logs/latest.log`
-      }
-      logFiles.sort((a, b) => b.mtime - a.mtime)
-      return logFiles[0].path
+      return window.api.app.findLunarLog()
     },
 
     async setLogFilePathFromPreset(preset: LogFilePreset): Promise<void> {
@@ -248,9 +215,18 @@ export const useConfigStore = defineStore('config', {
   persist: {
     key: 'thebois-config',
     storage: localStorage,
+    mergeDefaults: true,
     afterHydrate: (ctx) => {
-      if (!Array.isArray(ctx.store.activeColumns) || ctx.store.activeColumns.length === 0) {
-        ctx.store.activeColumns = DEFAULT_COLUMNS
+      const cols = ctx.store.activeColumns
+      const valid = Array.isArray(cols)
+        ? (cols as string[]).filter((c) => VALID_COLUMNS.has(c))
+        : []
+      ctx.store.activeColumns = valid.length > 0 ? valid : DEFAULT_COLUMNS
+
+      if (!ctx.store.theme?.colors) {
+        ctx.store.theme = { ...DEFAULT_THEME, colors: { ...DEFAULT_THEME_COLORS } }
+      } else {
+        ctx.store.theme.colors = { ...DEFAULT_THEME_COLORS, ...ctx.store.theme.colors }
       }
     },
   },

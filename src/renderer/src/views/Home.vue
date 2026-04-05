@@ -183,7 +183,7 @@ const avgFkdrColor = computed(() => {
       </div>
     </div>
 
-    <div v-else class="flex-1 overflow-y-auto overflow-x-auto">
+    <div v-else class="flex-1 overflow-y-auto overflow-x-auto themed-scroll">
       <table class="w-full border-separate" style="border-spacing: 0">
         <thead
           v-if="!config.integratedMode && config.columnLabels !== 'HIDDEN'"
@@ -246,7 +246,7 @@ const avgFkdrColor = computed(() => {
 
     <div
       v-if="sortedPlayers.length > 0 && !config.integratedMode"
-      class="flex items-center justify-between px-3.5 py-2 shrink-0 border-t"
+      class="flex items-center justify-between px-3.5 py-2 shrink-0 border-t no-drag"
       style="
         border-color: rgba(120, 80, 255, 0.12);
         background: linear-gradient(180deg, rgba(4, 6, 15, 0.6) 0%, rgba(8, 5, 22, 0.8) 100%);

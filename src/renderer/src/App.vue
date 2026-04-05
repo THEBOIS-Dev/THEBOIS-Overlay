@@ -44,8 +44,13 @@ const INTERACTIVE_SELECTOR =
 function isScrollable(el: HTMLElement): boolean {
   let node: HTMLElement | null = el
   while (node && node !== document.documentElement) {
-    const { overflowY } = window.getComputedStyle(node)
-    if ((overflowY === 'auto' || overflowY === 'scroll') && node.scrollHeight > node.clientHeight) {
+    const style = window.getComputedStyle(node)
+    const oy = style.overflowY
+    const ox = style.overflowX
+    if (
+      ((oy === 'auto' || oy === 'scroll') && node.scrollHeight > node.clientHeight) ||
+      ((ox === 'auto' || ox === 'scroll') && node.scrollWidth > node.clientWidth)
+    ) {
       return true
     }
     node = node.parentElement
