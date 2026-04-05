@@ -209,9 +209,8 @@ test('capture showcase', async () => {
 
     const totalColumns = ALL_COLUMNS.length
     await page.evaluate(
-      (cols, nameW) => window.api.win.fitColumns(cols, nameW),
-      totalColumns,
-      nameColPx,
+      ({ cols, nameW }) => window.api.win.fitColumns(cols, nameW),
+      { cols: totalColumns, nameW: nameColPx },
     )
 
     await page.waitForTimeout(300)
