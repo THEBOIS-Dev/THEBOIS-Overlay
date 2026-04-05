@@ -51,7 +51,6 @@ const CONFIG_SEED = {
   fontSize: 18,
   roundedCorners: false,
   textShadow: true,
-  logFilePath: '/dev/null',
   theme: {
     bgType: 'solid',
     bgColor: '#06091400',
@@ -132,6 +131,13 @@ test('capture showcase', async () => {
     await page.waitForSelector('header', { timeout: 15_000 })
 
     await page.waitForFunction(() => (window as any).__pinia !== undefined, { timeout: 10000 })
+
+    // Suppress the "log not configured" banner by setting logPathValid to null
+    await page.evaluate(() => {
+      const pinia = (window as any).__pinia
+      const state = pinia.state?.value
+      if (state?.players) state.players.logPathValid = null
+    })
 
     await page.evaluate(async (names: string[]) => {
       const pinia = (window as any).__pinia
@@ -217,24 +223,28 @@ test('capture showcase', async () => {
 
     await page.waitForTimeout(300)
 
-    const contentH = await page.evaluate((): number => {
+    const { contentW, contentH } = await page.evaluate((): { contentW: number; contentH: number } => {
       const titleBar = document.querySelector('header')?.offsetHeight ?? 42
       const thead = document.querySelector('thead') as HTMLElement | null
       const tbody = document.querySelector('tbody') as HTMLElement | null
       const footer = document.querySelector('.border-t') as HTMLElement | null
+      const table = document.querySelector('table') as HTMLElement | null
 
       const theadH = thead?.offsetHeight ?? 35
       const tbodyH = tbody?.scrollHeight ?? 0
       const footerH = footer?.offsetHeight ?? 34
+      const tableW = table?.scrollWidth ?? 0
 
-      return titleBar + theadH + tbodyH + footerH + 20
+      return {
+        contentW: tableW,
+        contentH: titleBar + theadH + tbodyH + footerH + 20,
+      }
     })
 
-    await app.evaluate(({ BrowserWindow }, h) => {
+    await app.evaluate(({ BrowserWindow }, { w, h }) => {
       const [win] = BrowserWindow.getAllWindows()
-      const [w] = win.getContentSize()
       win.setContentSize(w, h)
-    }, contentH)
+    }, { w: contentW, h: contentH })
 
     await page.waitForTimeout(400)
 
@@ -248,7 +258,7 @@ test('capture showcase', async () => {
       clip: {
         x: 0,
         y: 0,
-        width: nameColPx + (totalColumns - 1) * STAT_COL_W + REMOVE_W + BUFFER,
+        width: contentW,
         height: contentH - 16,
       },
     })
