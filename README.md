@@ -19,6 +19,14 @@
 
 ---
 
+## Showcase
+
+<p align="center">
+  <img src="assets/showcase.png" alt="Showcase" />
+</p>
+
+---
+
 ## Stack
 
 | Layer | Tech |
