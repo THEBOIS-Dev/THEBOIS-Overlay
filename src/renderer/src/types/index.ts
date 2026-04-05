@@ -31,9 +31,11 @@ export interface PikaClan {
   color?: string
 }
 
-export interface PikaRankMeta {
-  displayName: string
-  color?: string
+export interface PikaLevelInfo {
+  level: number
+  experience: number
+  percentage: number
+  rankDisplay: string
 }
 
 export interface PikaRankEntry {
@@ -47,7 +49,7 @@ export interface PikaRankEntry {
 export interface PikaProfile {
   username: string
   ranks: PikaRankEntry[]
-  rank: PikaRankMeta | null
+  rank: PikaLevelInfo | null
   clan: PikaClan | null
   lastSeen?: number
   online?: boolean
@@ -87,6 +89,7 @@ export interface Nick {
 
 export enum Column {
   NAME = 'NAME',
+  LEVEL = 'LEVEL',
   FKDR = 'FKDR',
   WLR = 'WLR',
   WINS = 'WINS',
@@ -249,9 +252,31 @@ export interface ColumnDef {
   label: string
   shortLabel: string
   sortable: boolean
+  fromProfile?: boolean
   thresholds?: readonly number[]
   getNum?: (p: Player) => number
   getStr?: (p: Player) => string | null
+  getColor?: (p: Player) => string
+}
+
+export function levelColor(level: number): string {
+  if (level >= 200) return '#ff5555'
+  if (level >= 160) return '#55ffff'
+  if (level >= 120) return '#55ff55'
+  if (level >= 100) return '#ff5555'
+  if (level >= 75) return '#ffff55'
+  if (level >= 60) return '#ffaa00'
+  if (level >= 50) return '#ff55ff'
+  if (level >= 45) return '#55ffff'
+  if (level >= 40) return '#55ff55'
+  if (level >= 35) return '#ffffff'
+  if (level >= 30) return '#ff5555'
+  if (level >= 25) return '#ffff55'
+  if (level >= 20) return '#ffaa00'
+  if (level >= 15) return '#ff55ff'
+  if (level >= 10) return '#55ffff'
+  if (level >= 5) return '#55ff55'
+  return '#aaaaaa'
 }
 
 export const COLUMNS: Record<Column, ColumnDef> = {
@@ -261,6 +286,14 @@ export const COLUMNS: Record<Column, ColumnDef> = {
     sortable: true,
     getNum: (p) => getRankSortIndex(p.profile),
     getStr: (p) => p.realName || p.name,
+  },
+  [Column.LEVEL]: {
+    label: 'Level',
+    shortLabel: 'LVL',
+    sortable: true,
+    fromProfile: true,
+    getNum: (p) => p.profile?.rank?.level ?? 0,
+    getColor: (p) => levelColor(p.profile?.rank?.level ?? 0),
   },
   [Column.FKDR]: {
     label: 'FKDR',

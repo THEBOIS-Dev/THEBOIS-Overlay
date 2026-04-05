@@ -74,6 +74,11 @@ const errorColor = computed(() => {
 
 function cellValue(col: Column): string {
   const def = COLUMNS[col]
+  if (def.fromProfile) {
+    if (!props.player.profile) return '—'
+    if (def.getNum) return fmt(def.getNum(props.player))
+    return '—'
+  }
   if (def.getStr) return def.getStr(props.player) ?? '—'
   if (!def.getNum) return '—'
   const n = def.getNum(props.player)
@@ -82,6 +87,7 @@ function cellValue(col: Column): string {
 
 function cellColor(col: Column): string {
   const def = COLUMNS[col]
+  if (def.getColor) return def.getColor(props.player)
   if (!def.thresholds || !def.getNum) return 'var(--color-ink-2)'
   return statColor(def.getNum(props.player), def.thresholds)
 }
@@ -194,7 +200,7 @@ function cellColor(col: Column): string {
       </template>
 
       <!-- NULL STATS — fetched OK but no BW data returned -->
-      <template v-else-if="!player.stats">
+      <template v-else-if="!player.stats && !COLUMNS[col].fromProfile">
         <span style="color: var(--color-ink-3); font-size: 0.82rem">—</span>
       </template>
 
