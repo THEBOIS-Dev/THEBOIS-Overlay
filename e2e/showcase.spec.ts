@@ -93,10 +93,6 @@ const NICKS_SEED = {
   nicks: [{ id: 'showcase-nick-1', nick: 'IStayKittens', realName: 'harshil_mc' }],
 }
 
-const STAT_COL_W = 65
-const REMOVE_W = 36
-const BUFFER = 4
-
 test.setTimeout(180_000)
 
 test('capture showcase', async () => {
