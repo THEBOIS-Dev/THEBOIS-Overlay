@@ -105,7 +105,6 @@ test('capture showcase', async () => {
     args: [mainEntry],
     env: {
       ...process.env,
-      NODE_ENV: 'production',
       ELECTRON_ENABLE_LOGGING: '0',
     },
   })
@@ -129,6 +128,8 @@ test('capture showcase', async () => {
     await page.reload({ waitUntil: 'domcontentloaded' })
 
     await page.waitForSelector('header', { timeout: 15_000 })
+
+    await page.waitForFunction(() => (window as any).__pinia !== undefined, { timeout: 10000 })
 
     await page.evaluate(async (names: string[]) => {
       const pinia = (window as any).__pinia
