@@ -70,7 +70,7 @@
   },
   "dependencies": {
     "@electron-toolkit/preload": "^3.0.1",
-    "@electron-toolkit/utils": "^3.0.0",
+    "@electron-toolkit/utils": "^4.0.0",
     "@logdna/tail-file": "^4.0.2",
     "axios": "^1.7.7",
     "discord-rpc": "^4.0.1",
@@ -82,7 +82,7 @@
     "vue-router": "^5.0.4"
   },
   "devDependencies": {
-    "@electron-toolkit/tsconfig": "^1.0.1",
+    "@electron-toolkit/tsconfig": "^2.0.0",
     "@tailwindcss/vite": "^4.0.0",
     "@types/node": "^25.5.2",
     "@vitejs/plugin-vue": "^6.0.5",
