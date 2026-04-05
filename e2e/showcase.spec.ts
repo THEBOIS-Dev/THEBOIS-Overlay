@@ -15,9 +15,10 @@ const PLAYERS = [
   'loxamy',
   'Abdomen',
   'resuns',
-  'fzoo_',
+  'izoo_',
   'Si1ent_',
   'Hiqhest',
+  'IStayKittens',
 ]
 
 const ALL_COLUMNS = [
@@ -42,7 +43,7 @@ const CONFIG_SEED = {
   activeColumns: ALL_COLUMNS,
   columnLabels: 'SHORT',
   sortBy: 'NAME',
-  sortAscending: false,
+  sortAscending: true,
   interval: 'total',
   mode: 'ALL_MODES',
   integratedMode: false,
@@ -50,6 +51,7 @@ const CONFIG_SEED = {
   fontSize: 18,
   roundedCorners: false,
   textShadow: true,
+  logFilePath: '/dev/null',
   theme: {
     bgType: 'solid',
     bgColor: '#06091400',
@@ -225,7 +227,7 @@ test('capture showcase', async () => {
       const tbodyH = tbody?.scrollHeight ?? 0
       const footerH = footer?.offsetHeight ?? 34
 
-      return titleBar + theadH + tbodyH + footerH + 4
+      return titleBar + theadH + tbodyH + footerH + 20
     })
 
     await app.evaluate(({ BrowserWindow }, h) => {
@@ -247,7 +249,7 @@ test('capture showcase', async () => {
         x: 0,
         y: 0,
         width: nameColPx + (totalColumns - 1) * STAT_COL_W + REMOVE_W + BUFFER,
-        height: contentH,
+        height: contentH - 16,
       },
     })
 
