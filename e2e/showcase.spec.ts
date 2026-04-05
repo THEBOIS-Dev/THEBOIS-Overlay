@@ -223,29 +223,23 @@ test('capture showcase', async () => {
 
     await page.waitForTimeout(300)
 
-    const { contentW, contentH } = await page.evaluate((): { contentW: number; contentH: number } => {
+    // Get the exact window width Electron set (fitColumns already calculated it correctly)
+    const contentW = await app.evaluate(({ BrowserWindow }) => {
+      const [win] = BrowserWindow.getAllWindows()
+      return win.getContentSize()[0]
+    })
+
+    const contentH = await page.evaluate((): number => {
       const titleBar = document.querySelector('header')?.offsetHeight ?? 42
       const thead = document.querySelector('thead') as HTMLElement | null
       const tbody = document.querySelector('tbody') as HTMLElement | null
       const footer = document.querySelector('.border-t') as HTMLElement | null
-      const table = document.querySelector('table') as HTMLElement | null
 
       const theadH = thead?.offsetHeight ?? 35
       const tbodyH = tbody?.scrollHeight ?? 0
       const footerH = footer?.offsetHeight ?? 34
 
-      // Measure exact width from left edge to right edge of last header cell
-      const ths = document.querySelectorAll('thead th')
-      const lastTh = ths[ths.length - 1] as HTMLElement | null
-      const firstTh = ths[0] as HTMLElement | null
-      const tableW = lastTh && firstTh
-        ? Math.ceil(lastTh.getBoundingClientRect().right - firstTh.getBoundingClientRect().left)
-        : (table?.scrollWidth ?? 0)
-
-      return {
-        contentW: tableW,
-        contentH: titleBar + theadH + tbodyH + footerH + 20,
-      }
+      return titleBar + theadH + tbodyH + footerH + 20
     })
 
     await app.evaluate(({ BrowserWindow }, { w, h }) => {
