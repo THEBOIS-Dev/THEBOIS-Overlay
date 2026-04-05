@@ -49,8 +49,8 @@ jobs:
             libxrandr2 \
             libxshmfence1
 
-      - name: Build app
-        run: npm run build
+      - name: Build app (development mode)
+        run: NODE_ENV=development npx electron-vite build --mode development
 
       - name: Capture showcase screenshot
         run: |
