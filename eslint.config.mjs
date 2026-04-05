@@ -19,7 +19,7 @@ export default tseslint.config(
     files: ['**/*.ts'],
     languageOptions: {
       parserOptions: {
-        project: ['./tsconfig.json', './tsconfig.node.json', './tsconfig.web.json', './tsconfig.e2e.json'],
+        project: ['./tsconfig.node.json', './tsconfig.web.json', './tsconfig.e2e.json'],
         tsconfigRootDir: import.meta.dirname,
       },
     },
@@ -38,19 +38,20 @@ export default tseslint.config(
     files: ['e2e/**/*.ts'],
     rules: {
       '@typescript-eslint/no-explicit-any': 'off',
+      '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
     },
   },
 
   ...pluginVue.configs['flat/recommended'],
 
+  // Must come AFTER the pluginVue spread to override its parserOptions
   {
     files: ['**/*.vue'],
     languageOptions: {
       parser: vueParser,
       parserOptions: {
         parser: tseslint.parser,
-        project: ['./tsconfig.web.json'],
-        tsconfigRootDir: import.meta.dirname,
+        project: false,
         extraFileExtensions: ['.vue'],
       },
     },
@@ -65,6 +66,7 @@ export default tseslint.config(
       '@typescript-eslint/no-unsafe-call': 'off',
       '@typescript-eslint/no-unsafe-return': 'off',
       '@typescript-eslint/no-unsafe-argument': 'off',
+      '@typescript-eslint/no-explicit-any': 'off',
     },
   },
 
