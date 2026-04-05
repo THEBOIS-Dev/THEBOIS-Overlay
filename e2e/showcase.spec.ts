@@ -41,7 +41,7 @@ const ALL_COLUMNS = [
 
 const CONFIG_SEED = {
   activeColumns: ALL_COLUMNS,
-  columnLabels: 'SHORT',
+  columnLabels: 'FULL',
   sortBy: 'NAME',
   sortAscending: true,
   interval: 'total',
@@ -233,7 +233,14 @@ test('capture showcase', async () => {
       const theadH = thead?.offsetHeight ?? 35
       const tbodyH = tbody?.scrollHeight ?? 0
       const footerH = footer?.offsetHeight ?? 34
-      const tableW = table?.scrollWidth ?? 0
+
+      // Measure exact width from left edge to right edge of last header cell
+      const ths = document.querySelectorAll('thead th')
+      const lastTh = ths[ths.length - 1] as HTMLElement | null
+      const firstTh = ths[0] as HTMLElement | null
+      const tableW = lastTh && firstTh
+        ? Math.ceil(lastTh.getBoundingClientRect().right - firstTh.getBoundingClientRect().left)
+        : (table?.scrollWidth ?? 0)
 
       return {
         contentW: tableW,
