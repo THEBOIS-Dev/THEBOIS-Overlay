@@ -49,8 +49,8 @@
 ```bash
 git clone https://github.com/THEBOIS-Dev/THEBOIS-Overlay.git
 cd THEBOIS-Overlay
-npm install
-npm run dev
+bun install
+bun run dev
 ```
 
 The dev window launches with HMR. The main process reloads on changes to `src/main/`.
@@ -60,18 +60,18 @@ The dev window launches with HMR. The main process reloads on changes to `src/ma
 ## Scripts
 
 ```bash
-npm run dev            # Start with hot reload
-npm run build          # Type-check + compile (no packaging)
-npm run build:win      # → THEBOIS.Overlay.Setup.x.x.x.exe (NSIS, x64)
-npm run build:mac      # → .dmg
-npm run build:linux    # → .AppImage
+bun run dev            # Start with hot reload
+bun run build          # Type-check + compile (no packaging)
+bun run build:win      # → THEBOIS.Overlay.Setup.x.x.x.exe (NSIS, x64)
+bun run build:mac      # → .dmg
+bun run build:linux    # → .AppImage
 
-npm run fix            # lint:fix + format in one shot (use before committing)
-npm run lint           # ESLint (zero warnings enforced)
-npm run lint:fix       # ESLint --fix
-npm run format         # Prettier write
-npm run format:check   # Prettier dry-run
-npm run typecheck      # vue-tsc --noEmit
+bun run fix            # lint:fix + format in one shot (use before committing)
+bun run lint           # ESLint (zero warnings enforced)
+bun run lint:fix       # ESLint --fix
+bun run format         # Prettier write
+bun run format:check   # Prettier dry-run
+bun run typecheck      # vue-tsc --noEmit
 ```
 
 ---
