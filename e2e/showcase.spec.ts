@@ -236,7 +236,7 @@ test('capture showcase', async () => {
       const tableW = table?.scrollWidth ?? 0
 
       return {
-        contentW: tableW,
+        contentW: tableW - 6,
         contentH: titleBar + theadH + tbodyH + footerH + 20,
       }
     })
@@ -259,7 +259,7 @@ test('capture showcase', async () => {
         x: 0,
         y: 0,
         width: contentW,
-        height: contentH - 16,
+        height: contentH,
       },
     })
 
