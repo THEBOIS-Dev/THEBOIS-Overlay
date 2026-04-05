@@ -5,9 +5,15 @@ import App from './App.vue'
 import router from './router'
 import './assets/global.css'
 
+declare global {
+  interface Window {
+    __pinia: ReturnType<typeof createPinia>
+  }
+}
+
 const pinia = createPinia()
 pinia.use(piniaPluginPersistedstate)
 
-;(window as any).__pinia = pinia
+window.__pinia = pinia
 
 createApp(App).use(pinia).use(router).mount('#app')
