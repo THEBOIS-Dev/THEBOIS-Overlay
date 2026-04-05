@@ -1,0 +1,8 @@
+{
+  "extends": "@electron-toolkit/tsconfig/tsconfig.node.json",
+  "include": ["e2e/**/*"],
+  "compilerOptions": {
+    "composite": true,
+    "types": ["node"]
+  }
+}
