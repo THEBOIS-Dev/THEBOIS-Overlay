@@ -8,7 +8,7 @@ import './assets/global.css'
 const pinia = createPinia()
 pinia.use(piniaPluginPersistedstate)
 
-if (import.meta.env.DEV) {
+if (process.env.NODE_ENV === 'development') {
   (window as any).__pinia = pinia
 }
 
