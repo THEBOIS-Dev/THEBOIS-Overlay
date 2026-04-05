@@ -50,8 +50,6 @@ const clanTagStyle = computed(() => {
 
 const errorLabel = computed(() => {
   switch (props.player.error) {
-    case 'not_found':
-      return 'N/A'
     case 'rate_limited':
       return '429'
     case 'network':
@@ -190,7 +188,7 @@ function cellColor(col: Column): string {
       <!-- ERROR -->
       <template v-else-if="player.error">
         <span
-          v-if="col === Column.FKDR || activeColumns.indexOf(col) === 1"
+          v-if="player.error !== 'not_found' && (col === Column.FKDR || activeColumns.indexOf(col) === 1)"
           style="font-size: 0.78rem; font-family: var(--font-mono)"
           :style="{ color: errorColor }"
         >

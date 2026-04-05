@@ -391,7 +391,41 @@ ipcMain.handle('app:get-path', (_, name: string) =>
   app.getPath(name as Parameters<typeof app.getPath>[0]),
 )
 
-function stripMcColorCodes(line: string): string {
+ipcMain.handle('app:find-lunar-log', async (): Promise<string> => {
+  const home = app.getPath('home')
+  const candidates = [
+    `${home}/.lunarclient/offline`,
+    `${home}/.lunarclient/profiles/lunar`,
+  ]
+  const found: { path: string; mtime: number }[] = []
+
+  for (const base of candidates) {
+    let versions: string[]
+    try {
+      versions = await fs.promises.readdir(base)
+    } catch {
+      continue
+    }
+    for (const version of versions) {
+      const logPath = `${base}/${version}/logs/latest.log`
+      try {
+        const stat = await fs.promises.stat(logPath)
+        if (stat.isFile()) found.push({ path: logPath, mtime: stat.mtimeMs })
+      } catch {
+        continue
+      }
+    }
+  }
+
+  if (found.length === 0) {
+    return `${home}/.lunarclient/offline/multiver/logs/latest.log`
+  }
+
+  found.sort((a, b) => b.mtime - a.mtime)
+  dbg.ipc(`app:find-lunar-log → ${found[0].path}  (${found.length} candidates)`)
+  return found[0].path
+})
+
   return line.replace(/[\u00A7\uFFFD][0-9A-FK-OR]/gi, '').replace(/[\u00A7\uFFFD]/g, '')
 }
 
