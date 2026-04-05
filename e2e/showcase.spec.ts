@@ -233,7 +233,7 @@ test('capture showcase', async () => {
       const theadH = thead?.offsetHeight ?? 35
       const tbodyH = tbody?.scrollHeight ?? 0
       const footerH = footer?.offsetHeight ?? 34
-      const tableW = (table?.scrollWidth - 5) ?? 0
+      const tableW = table?.scrollWidth ?? 0
 
       return {
         contentW: tableW,
