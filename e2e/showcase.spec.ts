@@ -205,27 +205,15 @@ test('capture showcase', async () => {
 
     await page.waitForTimeout(800)
 
-    const nameColPx = await page.evaluate((): number => {
-      const th = document.querySelector('thead th:first-child')
-      if (!th) return 260
-      return Math.ceil(th.getBoundingClientRect().width)
+    // Set a wide window so nothing wraps, then measure what's actually needed
+    await app.evaluate(({ BrowserWindow }) => {
+      const [win] = BrowserWindow.getAllWindows()
+      win.setContentSize(2000, 800)
     })
-
-    const totalColumns = ALL_COLUMNS.length
-    await page.evaluate(
-      ({ cols, nameW }) => window.api.win.fitColumns(cols, nameW),
-      { cols: totalColumns, nameW: nameColPx },
-    )
 
     await page.waitForTimeout(300)
 
-    // Get the exact window width Electron set (fitColumns already calculated it correctly)
-    const contentW = await app.evaluate(({ BrowserWindow }) => {
-      const [win] = BrowserWindow.getAllWindows()
-      return win.getContentSize()[0]
-    })
-
-    const contentH = await page.evaluate((): number => {
+    const { contentW, contentH } = await page.evaluate((): { contentW: number; contentH: number } => {
       const titleBar = document.querySelector('header')?.offsetHeight ?? 42
       const thead = document.querySelector('thead') as HTMLElement | null
       const tbody = document.querySelector('tbody') as HTMLElement | null
@@ -235,7 +223,13 @@ test('capture showcase', async () => {
       const tbodyH = tbody?.scrollHeight ?? 0
       const footerH = footer?.offsetHeight ?? 34
 
-      return titleBar + theadH + tbodyH + footerH + 20
+      // scrollWidth of body = full rendered width including all columns
+      const w = document.body.scrollWidth
+
+      return {
+        contentW: w,
+        contentH: titleBar + theadH + tbodyH + footerH + 20,
+      }
     })
 
     await app.evaluate(({ BrowserWindow }, { w, h }) => {
