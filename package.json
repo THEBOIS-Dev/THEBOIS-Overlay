@@ -84,14 +84,14 @@
   "devDependencies": {
     "@electron-toolkit/tsconfig": "^2.0.0",
     "@tailwindcss/vite": "^4.0.0",
-    "@types/node": "^22.7.4",
+    "@types/node": "^25.5.2",
     "@vitejs/plugin-vue": "^6.0.5",
-    "@vue/tsconfig": "^0.5.1",
+    "@vue/tsconfig": "^0.9.1",
     "conventional-changelog-conventionalcommits": "^9.3.1",
-    "electron": "^41.1.1",
-    "electron-builder": "^26.8.1",
-    "electron-vite": "^5.0.0",
-    "eslint": "^10.1.0",
+    "electron": "^31.0.2",
+    "electron-builder": "^25.1.8",
+    "electron-vite": "^2.3.0",
+    "eslint": "^10.2.0",
     "eslint-config-prettier": "^10.0.0",
     "eslint-plugin-vue": "^10.8.0",
     "prettier": "^3.0.0",
@@ -103,9 +103,9 @@
     "@semantic-release/npm": "^13.1.5",
     "@semantic-release/release-notes-generator": "^14.0.0",
     "tailwindcss": "^4.0.0",
-    "typescript": "^5.9.3",
-    "typescript-eslint": "^8.0.0",
+    "typescript": "^6.0.2",
+    "typescript-eslint": "^8.58.0",
     "vue-eslint-parser": "^10.4.0",
-    "vue-tsc": "^2.1.6"
+    "vue-tsc": "^3.2.6"
   }
 }
