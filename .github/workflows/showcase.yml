@@ -1,0 +1,68 @@
+name: Showcase Screenshot
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, master]
+    paths-ignore:
+      - 'assets/showcase.png'
+
+permissions:
+  contents: write
+
+jobs:
+  showcase:
+    name: Capture & Commit Showcase
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Install Playwright + system deps
+        run: |
+          npx playwright install --with-deps chromium
+          sudo apt-get install -y \
+            xvfb \
+            libgbm-dev \
+            libasound2t64 \
+            libatk1.0-0 \
+            libatk-bridge2.0-0 \
+            libcups2 \
+            libdrm2 \
+            libgtk-3-0 \
+            libxcomposite1 \
+            libxdamage1 \
+            libxfixes3 \
+            libxrandr2 \
+            libxshmfence1
+
+      - name: Build app
+        run: npm run build
+
+      - name: Capture showcase screenshot
+        run: |
+          xvfb-run --auto-servernum --server-args="-screen 0 1920x1080x24" \
+            npx playwright test e2e/showcase.spec.ts --reporter=line
+        env:
+          DISPLAY: :99
+          CI: true
+
+      - name: Commit screenshot to repo
+        run: |
+          mkdir -p assets
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add assets/showcase.png
+          git diff --staged --quiet || \
+            git commit -m "chore: update showcase screenshot [skip ci]"
+          git push
