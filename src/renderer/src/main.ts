@@ -8,4 +8,8 @@ import './assets/global.css'
 const pinia = createPinia()
 pinia.use(piniaPluginPersistedstate)
 
+if (import.meta.env.DEV) {
+  (window as any).__pinia = pinia
+}
+
 createApp(App).use(pinia).use(router).mount('#app')
