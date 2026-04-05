@@ -23,6 +23,7 @@ const api = {
 
   app: {
     getPath: (name: string): Promise<string> => ipcRenderer.invoke('app:get-path', name),
+    findLunarLog: (): Promise<string> => ipcRenderer.invoke('app:find-lunar-log'),
     openImageDialog: (): Promise<Electron.OpenDialogReturnValue> =>
       ipcRenderer.invoke('app:open-image-dialog'),
     readFileBase64: (filePath: string): Promise<string> =>

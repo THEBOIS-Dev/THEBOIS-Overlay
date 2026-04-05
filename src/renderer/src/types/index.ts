@@ -417,6 +417,7 @@ declare global {
       }
       app: {
         getPath(name: string): Promise<string>
+        findLunarLog(): Promise<string>
         openImageDialog(): Promise<Electron.OpenDialogReturnValue>
         readFileBase64(filePath: string): Promise<string>
         onClearPlayers(cb: () => void): () => void
