@@ -84,7 +84,7 @@
   "devDependencies": {
     "@electron-toolkit/tsconfig": "^2.0.0",
     "@tailwindcss/vite": "^4.0.0",
-    "@types/node": "^25.5.2",
+    "@types/node": "^25.6.0",
     "@vitejs/plugin-vue": "^6.0.5",
     "@vue/tsconfig": "^0.9.1",
     "conventional-changelog-conventionalcommits": "^9.3.1",
@@ -94,7 +94,7 @@
     "eslint": "^10.2.0",
     "eslint-config-prettier": "^10.0.0",
     "eslint-plugin-vue": "^10.8.0",
-    "prettier": "^3.0.0",
+    "prettier": "^3.8.3",
     "semantic-release": "^25.0.3",
     "@semantic-release/changelog": "^6.0.0",
     "@semantic-release/commit-analyzer": "^13.0.0",
@@ -103,8 +103,8 @@
     "@semantic-release/npm": "^13.1.5",
     "@semantic-release/release-notes-generator": "^14.0.0",
     "tailwindcss": "^4.0.0",
-    "typescript": "^6.0.2",
-    "typescript-eslint": "^8.58.0",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.58.2",
     "vue-eslint-parser": "^10.4.0",
     "vue-tsc": "^3.2.6"
   }
