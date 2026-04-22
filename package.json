@@ -72,7 +72,7 @@
     "@electron-toolkit/preload": "^3.0.1",
     "@electron-toolkit/utils": "^4.0.0",
     "@logdna/tail-file": "^4.0.2",
-    "axios": "^1.7.7",
+    "axios": "^1.15.2",
     "discord-rpc": "^4.0.1",
     "electron-updater": "^6.3.9",
     "electron-window-state": "^5.0.3",
