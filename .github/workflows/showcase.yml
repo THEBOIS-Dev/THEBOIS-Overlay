@@ -69,5 +69,7 @@ jobs:
           git add assets/showcase-pika.png assets/showcase-jartex.png
           git diff --staged --quiet && exit 0
           git commit -m "chore: update showcase screenshots [skip ci]"
+          git stash
           git pull --rebase origin HEAD
+          git stash pop
           git push
