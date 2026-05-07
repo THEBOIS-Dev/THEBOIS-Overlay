@@ -275,6 +275,7 @@ async function captureShowcase(
     await page.screenshot({
       path: path.join(outDir, outputFilename),
       fullPage: false,
+      omitBackground: true,
       clip: {
         x: 0,
         y: 0,
