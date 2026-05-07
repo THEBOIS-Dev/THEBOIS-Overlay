@@ -138,6 +138,7 @@ async function captureShowcase(
       ({ cfg, nicks }) => {
         localStorage.setItem('thebois-config', JSON.stringify(cfg));
         localStorage.setItem('nicks', JSON.stringify(nicks));
+        localStorage.setItem('skip-loading', '1');
       },
       { cfg: configSeed, nicks: NICKS_SEED },
     );
@@ -275,7 +276,6 @@ async function captureShowcase(
     await page.screenshot({
       path: path.join(outDir, outputFilename),
       fullPage: false,
-      omitBackground: true,
       clip: {
         x: 0,
         y: 0,
