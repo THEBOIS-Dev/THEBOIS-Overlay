@@ -83,7 +83,7 @@
     "pinia-plugin-persistedstate": "^4.1.1",
     "radix-vue": "^1.9.9",
     "vue": "^3.5.34",
-    "vue-router": "^5.0.4"
+    "vue-router": "^5.0.6"
   },
   "devDependencies": {
     "@electron-toolkit/tsconfig": "^2.0.0",
@@ -96,7 +96,7 @@
     "@semantic-release/release-notes-generator": "^14.0.0",
     "@tailwindcss/vite": "^4.0.0",
     "@types/node": "^25.5.2",
-    "@vitejs/plugin-vue": "^6.0.5",
+    "@vitejs/plugin-vue": "^6.0.6",
     "@vue/eslint-config-typescript": "^14.7.0",
     "@vue/tsconfig": "^0.9.1",
     "conventional-changelog-conventionalcommits": "^9.3.1",
