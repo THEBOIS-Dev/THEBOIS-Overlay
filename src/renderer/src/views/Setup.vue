@@ -1,14 +1,15 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import { useConfigStore } from '@renderer/store/config'
-import { usePlayersStore } from '@renderer/store/players'
-import type { LogFilePreset } from '@renderer/types'
-import ToggleSetting from '@renderer/components/ToggleSetting.vue'
+import { ref, onMounted } from 'vue';
+import { FolderOpen, CheckCircle2, XCircle, Loader } from 'lucide-vue-next';
+import { useConfigStore } from '@renderer/store/config';
+import { usePlayersStore } from '@renderer/store/players';
+import type { LogFilePreset } from '@renderer/types';
+import ToggleSetting from '@renderer/components/ToggleSetting.vue';
 
-const config = useConfigStore()
-const players = usePlayersStore()
+const config = useConfigStore();
+const players = usePlayersStore();
 
-const validState = ref<boolean | null>(null)
+const validState = ref<boolean | null>(null);
 
 const PRESETS: { label: string; value: LogFilePreset }[] = [
   { label: 'Standard', value: 'STANDARD' },
@@ -22,82 +23,120 @@ const PRESETS: { label: string; value: LogFilePreset }[] = [
   { label: 'Badlion', value: 'BADLION_CLIENT' },
   { label: 'PvPLounge', value: 'PVPLOUNGE' },
   { label: 'Custom', value: 'CUSTOM' },
-]
+];
 
 async function checkPath(): Promise<void> {
-  validState.value = null
-  const ok = await window.api.log.checkPath(config.logFilePath)
-  validState.value = ok
-  players.logPathValid = ok
-  if (ok) window.api.log.setPath(config.logFilePath)
-  else window.api.log.setPath(null)
+  validState.value = null;
+  const ok = await window.api.log.checkPath(config.logFilePath);
+  validState.value = ok;
+  players.logPathValid = ok;
+  if (ok) window.api.log.setPath(config.logFilePath);
+  else window.api.log.setPath(null);
 }
 
 async function applyPreset(preset: LogFilePreset): Promise<void> {
-  await config.setLogFilePathFromPreset(preset)
-  await checkPath()
+  await config.setLogFilePathFromPreset(preset);
+  await checkPath();
 }
 
 async function browse(): Promise<void> {
-  const result = await window.api.log.openDialog()
+  const result = await window.api.log.openDialog();
   if (!result.canceled && result.filePaths[0]) {
-    config.logFilePath = result.filePaths[0]
-    config.logFilePathPreset = 'CUSTOM'
-    await checkPath()
+    config.logFilePath = result.filePaths[0];
+    config.logFilePathPreset = 'CUSTOM';
+    await checkPath();
   }
 }
 
-onMounted(() => checkPath())
+onMounted(() => checkPath());
 </script>
 
 <template>
-  <div class="flex flex-col h-full overflow-y-auto px-4 py-4 gap-4 animate-fade-in">
+  <div
+    class="animate-fade-in themed-scroll flex h-full flex-col gap-3.5 overflow-y-auto px-3.5 py-3.5"
+  >
     <div>
-      <h2 class="text-sm font-semibold" style="color: var(--color-ink-1)">Setup</h2>
-      <p class="text-xs mt-0.5" style="color: var(--color-ink-3)">
+      <h2
+        class="font-semibold"
+        style="font-size: 0.92rem; color: var(--color-ink-1)"
+      >
+        Setup
+      </h2>
+      <p
+        class="mt-0.5"
+        style="font-size: 0.78rem; color: var(--color-ink-3)"
+      >
         Point THEBOIS at your Minecraft log file to enable auto-detection.
       </p>
     </div>
 
-    <div class="card p-4 flex flex-col gap-3">
+    <div class="card flex flex-col gap-3 p-3.5">
       <div class="flex items-center justify-between">
         <div>
-          <div class="text-sm font-medium" style="color: var(--color-ink-1)">Log File</div>
-          <div class="text-xs mt-0.5" style="color: var(--color-ink-3)">
+          <div
+            class="font-semibold"
+            style="font-size: 0.85rem; color: var(--color-ink-1)"
+          >
+            Log File
+          </div>
+          <div
+            class="mt-0.5"
+            style="font-size: 0.76rem; color: var(--color-ink-3)"
+          >
             Minecraft writes chat here. THEBOIS reads it live.
           </div>
         </div>
-
-        <div class="flex items-center gap-1.5 text-xs shrink-0">
+        <div
+          class="flex shrink-0 items-center gap-1.5"
+          style="font-size: 0.78rem"
+        >
           <template v-if="validState === true">
-            <span
-              class="w-2 h-2 rounded-full animate-pulse-dot"
-              style="background: var(--color-good)"
+            <CheckCircle2
+              :size="13"
+              style="color: var(--color-good)"
             />
-            <span style="color: var(--color-good)">Valid</span>
+            <span style="color: var(--color-good); font-weight: 500">Valid</span>
           </template>
           <template v-else-if="validState === false">
-            <span class="w-2 h-2 rounded-full" style="background: var(--color-bad)" />
-            <span style="color: var(--color-bad)">Not found</span>
+            <XCircle
+              :size="13"
+              style="color: var(--color-bad)"
+            />
+            <span style="color: var(--color-bad); font-weight: 500">Not found</span>
           </template>
           <template v-else>
-            <span class="w-2 h-2 rounded-full" style="background: var(--color-ink-3)" />
+            <Loader
+              :size="13"
+              class="animate-spin"
+              style="color: var(--color-ink-3)"
+            />
             <span style="color: var(--color-ink-3)">Checking…</span>
           </template>
         </div>
       </div>
 
       <div class="flex flex-col gap-1.5">
-        <label class="text-xs font-medium" style="color: var(--color-ink-2)">Client</label>
-        <div class="grid grid-cols-3 gap-1.5 no-drag">
+        <label
+          class="font-medium"
+          style="
+            font-size: 0.75rem;
+            color: var(--color-ink-3);
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+          "
+        >
+          Client
+        </label>
+        <div class="no-drag grid grid-cols-3 gap-1.5">
           <button
             v-for="preset in PRESETS"
             :key="preset.value"
-            class="rounded-lg px-2 py-2 text-xs font-medium transition-all"
+            class="rounded-md px-2 py-1.5 font-medium transition-all"
+            style="font-size: 0.76rem"
             :style="
               config.logFilePathPreset === preset.value
-                ? 'background: var(--color-accent-dim); border: 1px solid rgba(124,58,237,0.4); color: var(--color-accent-light);'
-                : 'background: rgba(255,255,255,0.04); border: 1px solid var(--color-border); color: var(--color-ink-2);'
+                ? 'background:var(--color-accent-dim);border:1px solid rgba(124,58,237,0.38);color:var(--color-accent-light)'
+                : 'background:rgba(255,255,255,0.03);border:1px solid var(--color-border);color:var(--color-ink-3)'
             "
             @click="applyPreset(preset.value)"
           >
@@ -107,28 +146,45 @@ onMounted(() => checkPath())
       </div>
 
       <div class="flex flex-col gap-1.5">
-        <label class="text-xs font-medium" style="color: var(--color-ink-2)">Path</label>
-        <div class="flex gap-2 no-drag">
+        <label
+          class="font-medium"
+          style="
+            font-size: 0.75rem;
+            color: var(--color-ink-3);
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+          "
+        >
+          Path
+        </label>
+        <div class="no-drag flex gap-2">
           <input
             v-model="config.logFilePath"
-            class="input-field flex-1"
-            style="font-family: var(--font-mono); font-size: 0.72rem"
+            class="input-field flex-1 font-mono"
+            style="font-size: 0.72rem"
             placeholder="/path/to/logs/latest.log"
             @blur="checkPath"
           />
           <button
-            class="btn px-3 py-1.5 rounded-lg text-xs shrink-0"
-            style="border: 1px solid var(--color-border)"
+            class="btn flex shrink-0 items-center gap-1.5 rounded-md border"
+            style="
+              padding: 0 0.7rem;
+              font-size: 0.76rem;
+              height: 32px;
+              border-color: var(--color-border);
+              color: var(--color-ink-2);
+            "
             @click="browse"
           >
+            <FolderOpen :size="12" />
             Browse
           </button>
         </div>
-        <p class="text-xs" style="color: var(--color-ink-3)">
+        <p style="font-size: 0.74rem; color: var(--color-ink-3)">
           Tip: type
           <code
-            class="px-1 rounded"
-            style="background: rgba(255, 255, 255, 0.07); font-family: var(--font-mono)"
+            class="rounded px-1.5 py-0.5 font-mono"
+            style="background: rgba(255, 255, 255, 0.07)"
           >
             /who
           </code>
@@ -137,12 +193,22 @@ onMounted(() => checkPath())
       </div>
     </div>
 
-    <div class="card p-4 flex flex-col gap-0">
-      <div
-        class="text-xs font-semibold uppercase tracking-widest mb-2"
-        style="color: var(--color-ink-3)"
-      >
-        Auto-detection
+    <div class="card flex flex-col gap-0.5 p-3.5">
+      <div class="mb-1.5 flex items-center gap-2.5">
+        <div
+          class="h-3 w-0.5 rounded-full"
+          style="background: var(--color-accent); opacity: 0.7"
+        />
+        <span
+          class="font-semibold tracking-widest uppercase"
+          style="font-size: 0.65rem; color: var(--color-ink-3); letter-spacing: 0.1em"
+        >
+          Auto-detection
+        </span>
+        <div
+          class="h-px flex-1"
+          style="background: linear-gradient(90deg, var(--color-border), transparent)"
+        />
       </div>
       <div class="divide-subtle">
         <ToggleSetting
@@ -173,8 +239,12 @@ onMounted(() => checkPath())
       </div>
     </div>
 
-    <div class="no-drag flex justify-end mt-auto pt-1">
-      <router-link to="/" class="btn-accent rounded-lg px-5 py-2 text-xs font-medium">
+    <div class="no-drag mt-auto flex justify-end pt-1">
+      <router-link
+        to="/"
+        class="btn-accent rounded-lg px-4 py-1.5 font-medium"
+        style="font-size: 0.82rem"
+      >
         Done →
       </router-link>
     </div>

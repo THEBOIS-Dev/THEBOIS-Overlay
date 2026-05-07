@@ -1,8 +1,16 @@
-import { defineStore } from 'pinia'
-import { Column, type BedwarsMode, type Interval, type LogFilePreset } from '@renderer/types'
+import { defineStore } from 'pinia';
+import type { PiniaPluginContext } from 'pinia';
+import 'pinia-plugin-persistedstate';
+import {
+  Column,
+  type BedwarsMode,
+  type Interval,
+  type LogFilePreset,
+  type Network,
+} from '@renderer/types';
 
-export type GradientStop = { color: string; position: number }
-export type BgType = 'solid' | 'gradient' | 'image'
+export type GradientStop = { color: string; position: number };
+export type BgType = 'solid' | 'gradient' | 'image';
 export type GradientDirection =
   | 'to right'
   | 'to left'
@@ -12,42 +20,42 @@ export type GradientDirection =
   | 'to bottom left'
   | 'to top right'
   | 'to top left'
-  | string
+  | string;
 
 export interface ThemeColors {
-  accent: string
-  accentLight: string
-  border: string
-  ink1: string
-  ink2: string
-  ink3: string
-  nick: string
-  good: string
-  bad: string
-  rankOwner: string
-  rankDeveloper: string
-  rankManager: string
-  rankAdmin: string
-  rankSrmod: string
-  rankModerator: string
-  rankHelper: string
-  rankTrial: string
-  rankYoutuber: string
-  rankChampion: string
-  rankTitan: string
-  rankElite: string
-  rankVip: string
+  accent: string;
+  accentLight: string;
+  border: string;
+  ink1: string;
+  ink2: string;
+  ink3: string;
+  nick: string;
+  good: string;
+  bad: string;
+  rankOwner: string;
+  rankDeveloper: string;
+  rankManager: string;
+  rankAdmin: string;
+  rankSrmod: string;
+  rankModerator: string;
+  rankHelper: string;
+  rankTrial: string;
+  rankYoutuber: string;
+  rankChampion: string;
+  rankTitan: string;
+  rankElite: string;
+  rankVip: string;
 }
 
 export interface ThemeConfig {
-  bgType: BgType
-  bgColor: string
-  bgGradientStops: GradientStop[]
-  bgGradientDir: GradientDirection
-  bgImageUrl: string
-  bgImageOpacity: number
-  opacity: number
-  colors: ThemeColors
+  bgType: BgType;
+  bgColor: string;
+  bgGradientStops: GradientStop[];
+  bgGradientDir: GradientDirection;
+  bgImageUrl: string;
+  bgImageOpacity: number;
+  opacity: number;
+  colors: ThemeColors;
 }
 
 export const DEFAULT_THEME_COLORS: ThemeColors = {
@@ -73,7 +81,7 @@ export const DEFAULT_THEME_COLORS: ThemeColors = {
   rankTitan: '#FFD700',
   rankElite: '#55FFFF',
   rankVip: '#55FF55',
-}
+};
 
 export const DEFAULT_THEME: ThemeConfig = {
   bgType: 'solid',
@@ -87,33 +95,34 @@ export const DEFAULT_THEME: ThemeConfig = {
   bgImageOpacity: 0.3,
   opacity: 0.92,
   colors: { ...DEFAULT_THEME_COLORS },
-}
+};
 
 export interface ConfigState {
-  logFilePath: string
-  logFilePathPreset: LogFilePreset
-  fontSize: number
-  opacity: number
-  roundedCorners: boolean
-  activeColumns: Column[]
-  sortBy: Column
-  sortAscending: boolean
-  interval: Interval
-  mode: BedwarsMode
-  columnLabels: 'FULL' | 'SHORT' | 'HIDDEN'
-  textShadow: boolean
-  integratedMode: boolean
-  autoAddPlayers: boolean
-  autoRemoveAllOnServerChange: boolean
-  autoRemoveAllOnWho: boolean
-  autoRemoveFinalDeath: boolean
-  autoRemoveOnQuit: boolean
-  missingPlayersWarning: boolean
-  shortcutMinimize: string
-  shortcutClearPlayers: string
-  discordRpcEnabled: boolean
-  autoUpdateEnabled: boolean
-  theme: ThemeConfig
+  network: Network;
+  logFilePath: string;
+  logFilePathPreset: LogFilePreset;
+  fontSize: number;
+  opacity: number;
+  roundedCorners: boolean;
+  activeColumns: Column[];
+  sortBy: Column;
+  sortAscending: boolean;
+  interval: Interval;
+  mode: BedwarsMode;
+  columnLabels: 'FULL' | 'SHORT' | 'HIDDEN';
+  textShadow: boolean;
+  integratedMode: boolean;
+  autoAddPlayers: boolean;
+  autoRemoveAllOnServerChange: boolean;
+  autoRemoveAllOnWho: boolean;
+  autoRemoveFinalDeath: boolean;
+  autoRemoveOnQuit: boolean;
+  missingPlayersWarning: boolean;
+  shortcutMinimize: string;
+  shortcutClearPlayers: string;
+  discordRpcEnabled: boolean;
+  autoUpdateEnabled: boolean;
+  theme: ThemeConfig;
 }
 
 const DEFAULT_COLUMNS: Column[] = [
@@ -125,12 +134,61 @@ const DEFAULT_COLUMNS: Column[] = [
   Column.FKDR,
   Column.WLR,
   Column.WIN_STREAK,
-]
+];
 
-const VALID_COLUMNS = new Set<string>(Object.values(Column))
+const VALID_COLUMNS = new Set<string>(Object.values(Column));
+
+type PresetPathKey = Exclude<LogFilePreset, 'CUSTOM' | 'LUNAR_CLIENT'>;
+
+function buildPresetPaths(
+  platform: string,
+  appData: string,
+  home: string,
+): Record<PresetPathKey, string> {
+  if (platform === 'win32') {
+    return {
+      STANDARD: `${appData}/.minecraft/logs/latest.log`,
+      TLAUNCHER: `${appData}/.minecraft/logs/latest.log`,
+      BADLION_CLIENT: `${appData}/.minecraft/logs/blclient/minecraft/latest.log`,
+      SILENT_CLIENT: `${appData}/.mc/logs/latest.log`,
+      FEATHER_CLIENT: `${appData}/.minecraft/feather/logs/latest.log`,
+      CM_CLIENT: `${appData}/.cmclient/logs/latest.log`,
+      SK_CLIENT: `${appData}/.minecraft/logs/latest.log`,
+      SALWYRR: `${appData}/.salwyrr/logs/latest.log`,
+      PVPLOUNGE: `${appData}/.pvplounge/logs/latest.log`,
+    };
+  }
+
+  if (platform === 'darwin') {
+    return {
+      STANDARD: `${appData}/minecraft/logs/latest.log`,
+      TLAUNCHER: `${appData}/minecraft/logs/latest.log`,
+      BADLION_CLIENT: `${appData}/minecraft/logs/blclient/minecraft/latest.log`,
+      SILENT_CLIENT: `${home}/.mc/logs/latest.log`,
+      FEATHER_CLIENT: `${appData}/minecraft/feather/logs/latest.log`,
+      CM_CLIENT: `${home}/.cmclient/logs/latest.log`,
+      SK_CLIENT: `${appData}/minecraft/logs/latest.log`,
+      SALWYRR: `${home}/.salwyrr/logs/latest.log`,
+      PVPLOUNGE: `${appData}/pvplounge/logs/latest.log`,
+    };
+  }
+
+  return {
+    STANDARD: `${home}/.minecraft/logs/latest.log`,
+    TLAUNCHER: `${home}/.minecraft/logs/latest.log`,
+    BADLION_CLIENT: `${home}/.minecraft/logs/blclient/minecraft/latest.log`,
+    SILENT_CLIENT: `${home}/.mc/logs/latest.log`,
+    FEATHER_CLIENT: `${home}/.minecraft/feather/logs/latest.log`,
+    CM_CLIENT: `${home}/.cmclient/logs/latest.log`,
+    SK_CLIENT: `${home}/.minecraft/logs/latest.log`,
+    SALWYRR: `${home}/.salwyrr/logs/latest.log`,
+    PVPLOUNGE: `${home}/.pvplounge/logs/latest.log`,
+  };
+}
 
 export const useConfigStore = defineStore('config', {
   state: (): ConfigState => ({
+    network: 'pikanetwork',
     logFilePath: '',
     logFilePathPreset: 'STANDARD',
     fontSize: 15,
@@ -159,75 +217,73 @@ export const useConfigStore = defineStore('config', {
 
   getters: {
     bgColor(state): string {
-      const t = state.theme
+      const t = state.theme;
       if (t.bgType === 'gradient') {
         const stops = t.bgGradientStops
           .slice()
           .sort((a, b) => a.position - b.position)
           .map((s) => `${s.color} ${s.position}%`)
-          .join(', ')
-        return `linear-gradient(${t.bgGradientDir}, ${stops})`
+          .join(', ');
+        return `linear-gradient(${t.bgGradientDir}, ${stops})`;
       }
       if (t.bgType === 'image') {
-        return 'rgb(6,9,20)'
+        return 'rgb(6,9,20)';
       }
-      const hex = t.bgColor.replace('#', '').slice(0, 6).padEnd(6, '0')
-      const r = parseInt(hex.slice(0, 2), 16)
-      const g = parseInt(hex.slice(2, 4), 16)
-      const b = parseInt(hex.slice(4, 6), 16)
-      return `rgb(${r},${g},${b})`
+      const hex = t.bgColor.replace('#', '').slice(0, 6).padEnd(6, '0');
+      const r = parseInt(hex.slice(0, 2), 16);
+      const g = parseInt(hex.slice(2, 4), 16);
+      const b = parseInt(hex.slice(4, 6), 16);
+      return `rgb(${r},${g},${b})`;
     },
   },
 
   actions: {
     resetTheme(): void {
-      this.theme = { ...DEFAULT_THEME, colors: { ...DEFAULT_THEME_COLORS } }
+      this.theme = { ...DEFAULT_THEME, colors: { ...DEFAULT_THEME_COLORS } };
     },
 
     async findLunarLogPath(): Promise<string> {
-      return window.api.app.findLunarLog()
+      return window.api.app.findLunarLog();
     },
 
     async setLogFilePathFromPreset(preset: LogFilePreset): Promise<void> {
-      this.logFilePathPreset = preset
-      if (preset === 'CUSTOM') return
+      this.logFilePathPreset = preset;
+      if (preset === 'CUSTOM') return;
       if (preset === 'LUNAR_CLIENT') {
-        this.logFilePath = await this.findLunarLogPath()
-        return
+        this.logFilePath = await this.findLunarLogPath();
+        return;
       }
-      const appData = await window.api.app.getPath('appData')
-      const paths: Record<Exclude<LogFilePreset, 'CUSTOM'>, string> = {
-        STANDARD: `${appData}/.minecraft/logs/latest.log`,
-        TLAUNCHER: `${appData}/.minecraft/logs/latest.log`,
-        BADLION_CLIENT: `${appData}/.minecraft/logs/blclient/minecraft/latest.log`,
-        LUNAR_CLIENT: '',
-        SILENT_CLIENT: `${appData}/.mc/logs/latest.log`,
-        FEATHER_CLIENT: `${appData}/.minecraft/feather/logs/latest.log`,
-        CM_CLIENT: `${appData}/.cmclient/logs/latest.log`,
-        SK_CLIENT: `${appData}/.minecraft/logs/latest.log`,
-        SALWYRR: `${appData}/.salwyrr/logs/latest.log`,
-        PVPLOUNGE: `${appData}/.pvplounge/logs/latest.log`,
-      }
-      this.logFilePath = paths[preset]
+
+      const platform = window.api.platform;
+      const [appData, home] = await Promise.all([
+        window.api.app.getPath('appData'),
+        window.api.app.getPath('home'),
+      ]);
+
+      const paths = buildPresetPaths(platform, appData, home);
+      this.logFilePath = paths[preset as PresetPathKey];
     },
   },
 
   persist: {
     key: 'thebois-config',
     storage: localStorage,
-    mergeDefaults: true,
-    afterHydrate: (ctx) => {
-      const cols = ctx.store.activeColumns
+    afterHydrate: (ctx: PiniaPluginContext) => {
+      const cols = ctx.store.activeColumns;
       const valid = Array.isArray(cols)
         ? (cols as string[]).filter((c) => VALID_COLUMNS.has(c))
-        : []
-      ctx.store.activeColumns = valid.length > 0 ? valid : DEFAULT_COLUMNS
+        : [];
+      ctx.store.activeColumns = valid.length > 0 ? valid : DEFAULT_COLUMNS;
 
       if (!ctx.store.theme?.colors) {
-        ctx.store.theme = { ...DEFAULT_THEME, colors: { ...DEFAULT_THEME_COLORS } }
+        ctx.store.theme = { ...DEFAULT_THEME, colors: { ...DEFAULT_THEME_COLORS } };
       } else {
-        ctx.store.theme.colors = { ...DEFAULT_THEME_COLORS, ...ctx.store.theme.colors }
+        ctx.store.theme.colors = { ...DEFAULT_THEME_COLORS, ...ctx.store.theme.colors };
+      }
+
+      if (!ctx.store.network) {
+        ctx.store.network = 'pikanetwork';
       }
     },
   },
-})
+});

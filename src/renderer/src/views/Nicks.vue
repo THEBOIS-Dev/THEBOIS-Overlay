@@ -1,98 +1,117 @@
 <script setup lang="ts">
-import { ref } from 'vue'
-import { useNicksStore } from '@renderer/store/nicks'
+import { useNicksStore } from '@renderer/store/nicks';
+import { Pencil, Plus, Tag, Trash2 } from 'lucide-vue-next';
+import { DialogContent, DialogOverlay, DialogPortal, DialogRoot } from 'radix-vue';
+import { ref } from 'vue';
 
-const nicks = useNicksStore()
+const nicks = useNicksStore();
 
-const modalOpen = ref(false)
-const editId = ref<string | null>(null)
-const formNick = ref('')
-const formReal = ref('')
+const modalOpen = ref(false);
+const editId = ref<string | null>(null);
+const formNick = ref('');
+const formReal = ref('');
 
 function openAdd(): void {
-  editId.value = null
-  formNick.value = ''
-  formReal.value = ''
-  modalOpen.value = true
+  editId.value = null;
+  formNick.value = '';
+  formReal.value = '';
+  modalOpen.value = true;
 }
 
 function openEdit(nick: { id: string; nick: string; realName: string }): void {
-  editId.value = nick.id
-  formNick.value = nick.nick
-  formReal.value = nick.realName
-  modalOpen.value = true
-}
-
-function closeModal(): void {
-  modalOpen.value = false
+  editId.value = nick.id;
+  formNick.value = nick.nick;
+  formReal.value = nick.realName;
+  modalOpen.value = true;
 }
 
 function save(): void {
-  if (!formNick.value || !formReal.value) return
-  if (editId.value) nicks.update(editId.value, formNick.value, formReal.value)
-  else nicks.add(formNick.value, formReal.value)
-  closeModal()
+  if (!formNick.value || !formReal.value) return;
+  if (editId.value) nicks.update(editId.value, formNick.value, formReal.value);
+  else nicks.add(formNick.value, formReal.value);
+  modalOpen.value = false;
 }
 </script>
 
 <template>
-  <div class="flex flex-col h-full overflow-hidden animate-fade-in">
+  <div class="animate-fade-in flex h-full flex-col overflow-hidden">
     <div
-      class="flex items-center justify-between px-4 py-3 shrink-0 border-b"
-      style="border-color: var(--color-border)"
+      class="flex shrink-0 items-center justify-between border-b px-3.5 py-2.5"
+      style="border-color: var(--color-border); background: rgba(255, 255, 255, 0.015)"
     >
       <div>
-        <h2 class="text-sm font-semibold" style="color: var(--color-ink-1)">Nick Manager</h2>
-        <p class="text-xs mt-0.5" style="color: var(--color-ink-3)">
+        <h2
+          class="font-semibold"
+          style="font-size: 0.9rem; color: var(--color-ink-1)"
+        >
+          Nick Manager
+        </h2>
+        <p
+          class="mt-0.5"
+          style="font-size: 0.75rem; color: var(--color-ink-3)"
+        >
           Map in-game nicks to real usernames.
         </p>
       </div>
-      <button class="btn-accent rounded-lg text-xs px-3 py-1.5 no-drag" @click="openAdd">
-        + Add
+      <button
+        class="btn-accent no-drag flex items-center gap-1.5 rounded-md"
+        style="font-size: 0.76rem; padding: 0.3rem 0.8rem"
+        @click="openAdd"
+      >
+        <Plus :size="11" />
+        Add Nick
       </button>
     </div>
 
-    <div class="flex-1 overflow-y-auto">
+    <div class="themed-scroll flex-1 overflow-y-auto">
       <div
         v-if="nicks.nicks.length === 0"
-        class="flex flex-col items-center justify-center h-full gap-2"
+        class="flex h-full flex-col items-center justify-center gap-2.5"
         style="opacity: 0.35"
       >
-        <svg
-          viewBox="0 0 24 24"
-          width="28"
-          height="28"
-          fill="currentColor"
-          style="color: var(--color-ink-3)"
+        <div
+          class="flex h-10 w-10 items-center justify-center rounded-full"
+          style="
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid var(--color-border);
+          "
         >
-          <path
-            d="M21.41 11.58l-9-9A2 2 0 0 0 11 2H4a2 2 0 0 0-2 2v7c0 .55.22 1.05.59 1.42l9 9c.36.36.86.58 1.41.58s1.05-.22 1.41-.59l7-7c.37-.36.59-.86.59-1.41s-.23-1.06-.59-1.42zM5.5 7a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3z"
+          <Tag
+            :size="18"
+            style="color: var(--color-ink-3)"
           />
-        </svg>
-        <p class="text-xs" style="color: var(--color-ink-3)">No nicks configured.</p>
+        </div>
+        <p style="font-size: 0.78rem; color: var(--color-ink-3)">No nicks configured.</p>
       </div>
 
-      <table v-else class="w-full text-xs">
-        <thead>
-          <tr style="border-bottom: 1px solid var(--color-border)">
+      <table
+        v-else
+        class="w-full"
+      >
+        <thead
+          class="sticky top-0 z-10"
+          style="background: rgba(4, 6, 15, 0.97)"
+        >
+          <tr
+            class="border-b"
+            style="border-color: var(--color-border)"
+          >
             <th
-              class="text-left px-4 py-2 font-medium"
+              class="px-3.5 py-2 text-left font-semibold tracking-widest uppercase"
               style="
+                font-size: 0.63rem;
                 color: var(--color-ink-3);
-                text-transform: uppercase;
-                font-size: 0.65rem;
-                letter-spacing: 0.08em;
+                letter-spacing: 0.09em;
               "
             >
               Nick
             </th>
             <th
-              class="text-left px-4 py-2 font-medium"
+              class="px-3.5 py-2 text-left font-semibold tracking-widest uppercase"
               style="
+                font-size: 0.63rem;
                 color: var(--color-ink-3);
-                text-transform: uppercase;
-                font-size: 0.65rem;
-                letter-spacing: 0.08em;
+                letter-spacing: 0.09em;
               "
             >
               Real Name
@@ -105,44 +124,36 @@ function save(): void {
             v-for="nick in nicks.nicks"
             :key="nick.id"
             class="group glass-row border-b"
-            style="border-color: var(--color-border)"
+            style="border-color: rgba(120, 80, 255, 0.07)"
           >
             <td
-              class="px-4 py-2.5"
-              style="font-family: var(--font-mono); font-size: 0.75rem; color: var(--color-nick)"
+              class="px-3.5 py-2.5 font-mono font-medium"
+              style="font-size: 0.78rem; color: var(--color-nick)"
             >
               {{ nick.nick }}
             </td>
-            <td class="px-4 py-2.5" style="color: var(--color-ink-1)">{{ nick.realName }}</td>
-            <td class="px-3 py-2.5">
+            <td
+              class="px-3.5 py-2.5 font-medium"
+              style="font-size: 0.82rem; color: var(--color-ink-1)"
+            >
+              {{ nick.realName }}
+            </td>
+            <td class="px-2.5 py-2.5">
               <div
-                class="flex items-center gap-1 justify-end opacity-0 group-hover:opacity-100 transition-opacity no-drag"
+                class="no-drag flex items-center justify-end gap-1 opacity-0 transition-opacity group-hover:opacity-100"
               >
-                <button class="btn w-6 h-6 rounded" @click="openEdit(nick)">
-                  <svg viewBox="0 0 24 24" width="11" height="11" fill="currentColor">
-                    <path
-                      d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"
-                    />
-                  </svg>
+                <button
+                  class="btn h-6 w-6 rounded"
+                  @click="openEdit(nick)"
+                >
+                  <Pencil :size="10" />
                 </button>
                 <button
-                  class="btn w-6 h-6 rounded"
+                  class="btn hover:text-bad h-6 w-6 rounded"
                   style="color: var(--color-ink-3)"
-                  onmouseover="
-                    this.style.background = 'rgba(248,113,113,0.15)'
-                    this.style.color = 'var(--color-bad)'
-                  "
-                  onmouseout="
-                    this.style.background = ''
-                    this.style.color = 'var(--color-ink-3)'
-                  "
                   @click="nicks.remove(nick.id)"
                 >
-                  <svg viewBox="0 0 24 24" width="11" height="11" fill="currentColor">
-                    <path
-                      d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"
-                    />
-                  </svg>
+                  <Trash2 :size="10" />
                 </button>
               </div>
             </td>
@@ -151,77 +162,83 @@ function save(): void {
       </table>
     </div>
 
-    <Teleport to="body">
-      <Transition name="fade">
-        <div
-          v-if="modalOpen"
-          class="fixed inset-0 z-50 flex items-center justify-center"
-          style="background: rgba(0, 0, 0, 0.65); backdrop-filter: blur(6px)"
-          @mousedown.self="closeModal"
+    <DialogRoot
+      :open="modalOpen"
+      @update:open="modalOpen = $event"
+    >
+      <DialogPortal>
+        <DialogOverlay
+          class="fixed inset-0 z-50"
+          style="background: rgba(0, 0, 0, 0.7); backdrop-filter: blur(8px)"
+        />
+        <DialogContent
+          class="animate-slide-up fixed top-1/2 left-1/2 z-50 flex w-72 -translate-x-1/2 -translate-y-1/2 flex-col gap-4 shadow-2xl focus:outline-none"
+          style="
+            background: rgba(9, 6, 22, 0.99);
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-xl);
+            padding: 1.25rem;
+            box-shadow:
+              0 24px 64px rgba(0, 0, 0, 0.7),
+              0 0 0 1px rgba(124, 58, 237, 0.1);
+          "
         >
-          <div
-            class="w-72 p-5 flex flex-col gap-4 shadow-2xl animate-slide-up"
-            style="
-              background: rgba(10, 12, 26, 0.99);
-              border: 1px solid var(--color-border);
-              border-radius: var(--radius-xl);
-            "
+          <h3
+            class="font-semibold"
+            style="font-size: 0.9rem; color: var(--color-ink-1)"
           >
-            <h3 class="text-sm font-semibold" style="color: var(--color-ink-1)">
-              {{ editId ? 'Edit Nick' : 'Add Nick' }}
-            </h3>
+            {{ editId ? 'Edit Nick' : 'Add Nick' }}
+          </h3>
 
-            <div class="flex flex-col gap-3 no-drag">
-              <div class="flex flex-col gap-1">
-                <label class="text-xs" style="color: var(--color-ink-2)">In-game Nick</label>
-                <input
-                  v-model.trim="formNick"
-                  class="input-field"
-                  placeholder="Nicked Username"
-                  @keydown.enter="save"
-                />
-              </div>
-              <div class="flex flex-col gap-1">
-                <label class="text-xs" style="color: var(--color-ink-2)">Real Username</label>
-                <input
-                  v-model.trim="formReal"
-                  class="input-field"
-                  placeholder="Actual Username"
-                  @keydown.enter="save"
-                />
-              </div>
+          <div class="no-drag flex flex-col gap-3">
+            <div class="flex flex-col gap-1.5">
+              <label style="font-size: 0.76rem; color: var(--color-ink-3)"
+                >In-game Nick</label
+              >
+              <input
+                v-model.trim="formNick"
+                class="input-field"
+                placeholder="Nicked username"
+                @keydown.enter="save"
+              />
             </div>
-
-            <div class="flex gap-2 justify-end">
-              <button
-                class="btn px-4 py-1.5 rounded-lg text-xs"
-                style="border: 1px solid var(--color-border)"
-                @click="closeModal"
+            <div class="flex flex-col gap-1.5">
+              <label style="font-size: 0.76rem; color: var(--color-ink-3)"
+                >Real Username</label
               >
-                Cancel
-              </button>
-              <button
-                class="btn-accent rounded-lg px-4 py-1.5 text-xs"
-                :disabled="!formNick || !formReal"
-                @click="save"
-              >
-                Save
-              </button>
+              <input
+                v-model.trim="formReal"
+                class="input-field"
+                placeholder="Actual username"
+                @keydown.enter="save"
+              />
             </div>
           </div>
-        </div>
-      </Transition>
-    </Teleport>
+
+          <div class="flex justify-end gap-2">
+            <button
+              class="btn rounded-md"
+              style="
+                padding: 0.35rem 0.9rem;
+                font-size: 0.78rem;
+                border: 1px solid var(--color-border);
+                color: var(--color-ink-2);
+              "
+              @click="modalOpen = false"
+            >
+              Cancel
+            </button>
+            <button
+              class="btn-accent rounded-md"
+              style="padding: 0.35rem 0.9rem; font-size: 0.78rem"
+              :disabled="!formNick || !formReal"
+              @click="save"
+            >
+              Save
+            </button>
+          </div>
+        </DialogContent>
+      </DialogPortal>
+    </DialogRoot>
   </div>
 </template>
-
-<style scoped>
-.fade-enter-active,
-.fade-leave-active {
-  transition: opacity 0.15s ease;
-}
-.fade-enter-from,
-.fade-leave-to {
-  opacity: 0;
-}
-</style>

@@ -1,183 +1,233 @@
-import { app, shell, BrowserWindow, ipcMain, dialog, clipboard, globalShortcut } from 'electron'
-import { join } from 'path'
-import { electronApp, optimizer, is } from '@electron-toolkit/utils'
-import { autoUpdater } from 'electron-updater'
-import windowStateKeeper from 'electron-window-state'
-import axios from 'axios'
-import fs from 'fs'
-import readline from 'readline'
-import TailFile from '@logdna/tail-file'
+/* eslint-disable no-console */
+import { electronApp, is, optimizer } from '@electron-toolkit/utils';
+import {
+  app,
+  BrowserWindow,
+  clipboard,
+  dialog,
+  globalShortcut,
+  ipcMain,
+  screen,
+  shell,
+} from 'electron';
+import { join } from 'path';
 
-const PIKA_BASE = 'https://stats.pika-network.net/api'
-const TIMEOUT_MS = 8_000
-const MAX_RETRIES = 3
-const RETRY_DELAY_MS = 1000
-const MAX_CONCURRENT = 16
-const CACHE_TTL_MS = 60_000
+if (process.platform === 'linux') {
+  app.commandLine.appendSwitch('disable-gpu-vsync');
+  app.commandLine.appendSwitch('disable-frame-rate-limit');
+  app.commandLine.appendSwitch('ignore-gpu-blocklist');
+  app.commandLine.appendSwitch('disable-gpu-sandbox');
+}
 
-const RESET = '\x1b[0m'
-const DIM = '\x1b[2m'
-const CYAN = '\x1b[36m'
-const GREEN = '\x1b[32m'
-const YELLOW = '\x1b[33m'
-const RED = '\x1b[31m'
-const MAGENTA = '\x1b[35m'
-const BLUE = '\x1b[34m'
+if (process.platform === 'darwin') {
+  app.commandLine.appendSwitch('ignore-gpu-blocklist');
+  app.commandLine.appendSwitch('enable-gpu-rasterization');
+  app.commandLine.appendSwitch('enable-zero-copy');
+}
+
+app.commandLine.appendSwitch(
+  'enable-hardware-overlays',
+  'single-fullscreen,single-on-top',
+);
+
+import TailFile from '@logdna/tail-file';
+import axios from 'axios';
+import { autoUpdater } from 'electron-updater';
+import windowStateKeeper from 'electron-window-state';
+import fs from 'fs';
+import http from 'http';
+import https from 'https';
+import readline from 'readline';
+
+const PIKA_BASE = 'https://stats.pika-network.net/api';
+const JARTEX_BASE = 'https://stats.jartexnetwork.com/api';
+const TIMEOUT_MS = 8_000;
+const MAX_RETRIES = 3;
+const RETRY_DELAY_MS = 1000;
+const MAX_CONCURRENT = 16;
+const CACHE_TTL_MS = 60_000;
+
+const httpAgent = new http.Agent({ keepAlive: true, maxSockets: MAX_CONCURRENT });
+const httpsAgent = new https.Agent({ keepAlive: true, maxSockets: MAX_CONCURRENT });
+
+const RESET = '\x1b[0m';
+const DIM = '\x1b[2m';
+const CYAN = '\x1b[36m';
+const GREEN = '\x1b[32m';
+const YELLOW = '\x1b[33m';
+const RED = '\x1b[31m';
+const MAGENTA = '\x1b[35m';
+const BLUE = '\x1b[34m';
 
 function ts(): string {
-  return DIM + new Date().toISOString().slice(11, 23) + RESET + ' '
+  return `${DIM + new Date().toISOString().slice(11, 23) + RESET} `;
 }
 
-const dbg = {
-  cache: (msg: string) => console.log(ts() + CYAN + '[CACHE] ' + RESET + msg),
-  dedup: (msg: string) => console.log(ts() + MAGENTA + '[DEDUP] ' + RESET + msg),
-  sem: (msg: string) => console.log(ts() + BLUE + '[SEM]   ' + RESET + msg),
-  http: (msg: string) => console.log(ts() + GREEN + '[HTTP]  ' + RESET + msg),
-  retry: (msg: string) => console.log(ts() + YELLOW + '[RETRY] ' + RESET + msg),
-  ipc: (msg: string) => console.log(ts() + YELLOW + '[IPC]   ' + RESET + msg),
-  error: (msg: string) => console.log(ts() + RED + '[ERROR] ' + RESET + msg),
-  rpc: (msg: string) => console.log(ts() + BLUE + '[RPC]   ' + RESET + msg),
-}
+const noop = (): void => {};
+
+const dbg = is.dev
+  ? {
+      cache: (msg: string) => console.log(`${ts() + CYAN}[CACHE] ${RESET}${msg}`),
+      dedup: (msg: string) => console.log(`${ts() + MAGENTA}[DEDUP] ${RESET}${msg}`),
+      sem: (msg: string) => console.log(`${ts() + BLUE}[SEM]   ${RESET}${msg}`),
+      http: (msg: string) => console.log(`${ts() + GREEN}[HTTP]  ${RESET}${msg}`),
+      retry: (msg: string) => console.log(`${ts() + YELLOW}[RETRY] ${RESET}${msg}`),
+      ipc: (msg: string) => console.log(`${ts() + YELLOW}[IPC]   ${RESET}${msg}`),
+      error: (msg: string) => console.log(`${ts() + RED}[ERROR] ${RESET}${msg}`),
+      rpc: (msg: string) => console.log(`${ts() + BLUE}[RPC]   ${RESET}${msg}`),
+    }
+  : {
+      cache: noop,
+      dedup: noop,
+      sem: noop,
+      http: noop,
+      retry: noop,
+      ipc: noop,
+      error: noop,
+      rpc: noop,
+    };
 
 interface CacheEntry<T> {
-  data: T
-  expires: number
+  data: T;
+  expires: number;
 }
 
 class SimpleCache {
-  private store = new Map<string, CacheEntry<unknown>>()
+  private store = new Map<string, CacheEntry<unknown>>();
 
   set<T>(key: string, data: T, ttlMs: number = CACHE_TTL_MS): void {
-    this.store.set(key, { data, expires: Date.now() + ttlMs })
-    dbg.cache(`SET  "${key}"  (TTL ${ttlMs / 1000}s, store size: ${this.store.size})`)
+    this.store.set(key, { data, expires: Date.now() + ttlMs });
+    dbg.cache(`SET  "${key}"  (TTL ${ttlMs / 1000}s, store size: ${this.store.size})`);
   }
 
   get<T>(key: string): T | null {
-    const entry = this.store.get(key)
+    const entry = this.store.get(key);
     if (!entry) {
-      dbg.cache(`MISS "${key}"`)
-      return null
+      dbg.cache(`MISS "${key}"`);
+      return null;
     }
     if (Date.now() > entry.expires) {
-      this.store.delete(key)
-      dbg.cache(`EXPIRED "${key}"`)
-      return null
+      this.store.delete(key);
+      dbg.cache(`EXPIRED "${key}"`);
+      return null;
     }
-    const ttlLeft = Math.round((entry.expires - Date.now()) / 1000)
-    dbg.cache(`HIT  "${key}"  (${ttlLeft}s left)`)
-    return entry.data as T
+    const ttlLeft = Math.round((entry.expires - Date.now()) / 1000);
+    dbg.cache(`HIT  "${key}"  (${ttlLeft}s left)`);
+    return entry.data as T;
   }
 
   clear(): void {
-    dbg.cache(`CLEAR (${this.store.size} entries flushed)`)
-    this.store.clear()
+    dbg.cache(`CLEAR (${this.store.size} entries flushed)`);
+    this.store.clear();
   }
 }
 
-const cache = new SimpleCache()
-const inFlight = new Map<string, Promise<unknown>>()
+const cache = new SimpleCache();
+const inFlight = new Map<string, Promise<unknown>>();
 
 function dedupe<T>(key: string, fn: () => Promise<T>): Promise<T> {
-  const existing = inFlight.get(key)
+  const existing = inFlight.get(key);
   if (existing) {
-    dbg.dedup(`REUSE in-flight "${key}" (${inFlight.size} total in-flight)`)
-    return existing as Promise<T>
+    dbg.dedup(`REUSE in-flight "${key}" (${inFlight.size} total in-flight)`);
+    return existing as Promise<T>;
   }
-  dbg.dedup(`NEW   "${key}"`)
+  dbg.dedup(`NEW   "${key}"`);
   const promise = fn().finally(() => {
-    inFlight.delete(key)
-    dbg.dedup(`DONE  "${key}" (${inFlight.size} remaining in-flight)`)
-  })
-  inFlight.set(key, promise)
-  return promise
+    inFlight.delete(key);
+    dbg.dedup(`DONE  "${key}" (${inFlight.size} remaining in-flight)`);
+  });
+  inFlight.set(key, promise);
+  return promise;
 }
 
 class Semaphore {
-  private slots: number
-  private queue: Array<() => void> = []
+  private slots: number;
+  private queue: Array<() => void> = [];
 
   constructor(limit: number) {
-    this.slots = limit
+    this.slots = limit;
   }
 
   acquire(): Promise<void> {
     if (this.slots > 0) {
-      this.slots--
-      dbg.sem(`ACQUIRE (slots left: ${this.slots}, queued: ${this.queue.length})`)
-      return Promise.resolve()
+      this.slots--;
+      dbg.sem(`ACQUIRE (slots left: ${this.slots}, queued: ${this.queue.length})`);
+      return Promise.resolve();
     }
-    dbg.sem(`QUEUE   (no slots, queued: ${this.queue.length + 1})`)
-    return new Promise<void>((resolve) => this.queue.push(resolve))
+    dbg.sem(`QUEUE   (no slots, queued: ${this.queue.length + 1})`);
+    return new Promise<void>((resolve) => this.queue.push(resolve));
   }
 
   release(): void {
     if (this.queue.length > 0) {
       dbg.sem(
         `RELEASE → waking queued request (slots: ${this.slots}, queued remaining: ${this.queue.length - 1})`,
-      )
-      this.queue.shift()!()
+      );
+      this.queue.shift()!();
     } else {
-      this.slots++
-      dbg.sem(`RELEASE (slots: ${this.slots}, queue empty)`)
+      this.slots++;
+      dbg.sem(`RELEASE (slots: ${this.slots}, queue empty)`);
     }
   }
 }
 
-const sem = new Semaphore(MAX_CONCURRENT)
-const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms))
+const sem = new Semaphore(MAX_CONCURRENT);
+const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
 
 async function withRetry<T>(
   fn: () => Promise<T>,
   retries = MAX_RETRIES,
   delayMs = RETRY_DELAY_MS,
 ): Promise<T> {
-  let lastErr: unknown
+  let lastErr: unknown;
   for (let i = 0; i <= retries; i++) {
     try {
-      return await fn()
+      return await fn();
     } catch (err) {
-      lastErr = err
+      lastErr = err;
       if (i < retries) {
-        const wait = delayMs * (i + 1)
+        const wait = delayMs * (i + 1);
         dbg.retry(
           `attempt ${i + 1}/${retries} failed — retrying in ${wait}ms  (${(err as Error).message})`,
-        )
-        await sleep(wait)
+        );
+        await sleep(wait);
       }
     }
   }
-  throw lastErr
+  throw lastErr;
 }
 
 async function pikaGet<T = unknown>(url: string) {
-  await sem.acquire()
-  const t0 = Date.now()
-  dbg.http(`→ GET ${url}`)
+  await sem.acquire();
+  const t0 = Date.now();
+  dbg.http(`→ GET ${url}`);
   try {
     const res = await withRetry(async () => {
       const r = await axios.get<T>(url, {
         timeout: TIMEOUT_MS,
         headers: { Accept: 'application/json' },
         validateStatus: () => true,
-      })
-      if (r.status === 429) throw new Error('Rate limited (429)')
-      if (r.status >= 500) throw new Error(`Server error ${r.status}`)
-      return r
-    })
-    dbg.http(`← ${res.status} ${url}  (${Date.now() - t0}ms)`)
-    return res
+        httpAgent,
+        httpsAgent,
+      });
+      if (r.status === 429) throw new Error('Rate limited (429)');
+      if (r.status >= 500) throw new Error(`Server error ${r.status}`);
+      return r;
+    });
+    dbg.http(`← ${res.status} ${url}  (${Date.now() - t0}ms)`);
+    return res;
   } catch (err) {
-    dbg.error(`FAIL ${url}  (${Date.now() - t0}ms) — ${(err as Error).message}`)
-    throw err
+    dbg.error(`FAIL ${url}  (${Date.now() - t0}ms) — ${(err as Error).message}`);
+    throw err;
   } finally {
-    sem.release()
+    sem.release();
   }
 }
 
-let win: BrowserWindow | null = null
+let win: BrowserWindow | null = null;
 
 function createWindow(): void {
-  const state = windowStateKeeper({ defaultWidth: 700, defaultHeight: 460 })
+  const state = windowStateKeeper({ defaultWidth: 700, defaultHeight: 460 });
 
   win = new BrowserWindow({
     title: 'THEBOIS Overlay',
@@ -198,326 +248,610 @@ function createWindow(): void {
       preload: join(__dirname, '../preload/index.js'),
       sandbox: false,
       contextIsolation: true,
+      backgroundThrottling: false,
+      v8CacheOptions: 'code',
     },
-  })
+  });
 
-  state.manage(win)
-  win.setAlwaysOnTop(true, 'screen-saver')
+  state.manage(win);
+  win.setAlwaysOnTop(true, 'screen-saver');
 
-  let saveTimer: NodeJS.Timeout | null = null
-  const debounceSave = (): void => {
-    if (saveTimer) clearTimeout(saveTimer)
-    saveTimer = setTimeout(() => state.saveState(win!), 800)
+  if (process.platform === 'darwin') {
+    win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+    win.setAlwaysOnTop(true, 'floating');
   }
-  win.on('resize', debounceSave)
-  win.on('move', debounceSave)
+
+  let saveTimer: NodeJS.Timeout | null = null;
+  const debounceSave = (): void => {
+    if (saveTimer) clearTimeout(saveTimer);
+    saveTimer = setTimeout(() => state.saveState(win!), 800);
+  };
+  win.on('resize', debounceSave);
+  win.on('move', debounceSave);
 
   win.on('close', () => {
     win?.webContents
       .executeJavaScript(`try { localStorage.removeItem('players') } catch(e) {}`)
-      .catch(() => {})
-  })
+      .catch(() => {});
+  });
 
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
-    void win.loadURL(process.env['ELECTRON_RENDERER_URL'])
+    void win.loadURL(process.env['ELECTRON_RENDERER_URL']);
   } else {
-    void win.loadFile(join(__dirname, '../renderer/index.html'))
+    void win.loadFile(join(__dirname, '../renderer/index.html'));
   }
 }
 
 void app.whenReady().then(async () => {
-  electronApp.setAppUserModelId('com.thebois.overlay')
-  app.on('browser-window-created', (_, w) => optimizer.watchWindowShortcuts(w))
-  if (process.platform === 'linux') await sleep(500)
-  createWindow()
-})
+  electronApp.setAppUserModelId('com.thebois.overlay');
+  app.on('browser-window-created', (_, w) => optimizer.watchWindowShortcuts(w));
+  if (process.platform === 'linux') await sleep(500);
+  createWindow();
+});
 
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') app.quit()
-})
+  if (process.platform !== 'darwin') app.quit();
+});
 
-ipcMain.on('win:minimize', () => win?.minimize())
-ipcMain.on('win:close', () => win?.close())
+ipcMain.on('win:minimize', () => win?.minimize());
+ipcMain.on('win:close', () => win?.close());
 ipcMain.on('win:toggle-minimize', () => {
-  if (win?.isMinimized()) win?.showInactive()
-  else win?.minimize()
-})
-ipcMain.on('win:open-external', (_, url: string) => void shell.openExternal(url))
+  if (win?.isMinimized()) win?.showInactive();
+  else win?.minimize();
+});
+ipcMain.on('win:open-external', (_, url: string) => void shell.openExternal(url));
+
+let linuxCursorPoll: NodeJS.Timeout | null = null;
+
+function startLinuxCursorPoll(): void {
+  if (linuxCursorPoll) return;
+  linuxCursorPoll = setInterval(() => {
+    if (!win) return;
+    const cursor = screen.getCursorScreenPoint();
+    const bounds = win.getBounds();
+    if (
+      cursor.x >= bounds.x &&
+      cursor.x < bounds.x + bounds.width &&
+      cursor.y >= bounds.y &&
+      cursor.y < bounds.y + bounds.height
+    ) {
+      win.webContents.send(
+        'cursor:forwarded-move',
+        cursor.x - bounds.x,
+        cursor.y - bounds.y,
+      );
+    }
+  }, 16);
+}
+
+function stopLinuxCursorPoll(): void {
+  if (!linuxCursorPoll) return;
+  clearInterval(linuxCursorPoll);
+  linuxCursorPoll = null;
+}
 
 ipcMain.on('win:set-ignore-mouse', (_, ignore: boolean) => {
-  if (!win) return
+  if (!win) return;
   if (ignore) {
-    win.setIgnoreMouseEvents(true, { forward: true })
+    win.setIgnoreMouseEvents(true, { forward: true });
+    if (process.platform === 'linux') startLinuxCursorPoll();
   } else {
-    win.setIgnoreMouseEvents(false)
+    win.setIgnoreMouseEvents(false);
+    if (process.platform === 'linux') stopLinuxCursorPoll();
   }
-})
+});
 
 ipcMain.on('win:focus', () => {
   if (win && !win.isFocused()) {
-    win.setAlwaysOnTop(true, 'screen-saver')
-    win.focus()
+    win.setAlwaysOnTop(true, 'screen-saver');
+    win.focus();
   }
-})
+});
 
-const STAT_COL_W = 65
-const REMOVE_W = 36
-const BUFFER = 4
+const STAT_COL_W = 65;
+const REMOVE_W = 36;
+const BUFFER = 4;
 
 ipcMain.on('win:fit-columns', (_, numColumns: number, nameColPx: number) => {
-  if (!win) return
-  const statCols = Math.max(0, numColumns - 1)
-  const w = Math.round(nameColPx) + statCols * STAT_COL_W + REMOVE_W + BUFFER
-  const { height } = win.getContentBounds()
+  if (!win) return;
+  const statCols = Math.max(0, numColumns - 1);
+  const w = Math.round(nameColPx) + statCols * STAT_COL_W + REMOVE_W + BUFFER;
+  const { height } = win.getContentBounds();
   dbg.ipc(
     `win:fit-columns  cols=${numColumns}  nameCol=${Math.round(nameColPx)}px  → contentWidth=${w}`,
-  )
-  win.setContentSize(w, height)
-})
+  );
+  win.setContentSize(w, height);
+});
 
 ipcMain.handle('win:screenshot', async () => {
-  const img = await win?.webContents.capturePage()
-  if (img) clipboard.writeImage(img)
-})
+  const img = await win?.webContents.capturePage();
+  if (img) clipboard.writeImage(img);
+});
 
 type PikaFetchResult = {
-  profile: unknown
-  stats: unknown
-  notFound: boolean
-  rateLimit: boolean
-}
+  profile: unknown;
+  stats: unknown;
+  notFound: boolean;
+  rateLimit: boolean;
+};
 
 ipcMain.handle(
   'pika:fetch',
-  (_, username: string, interval = 'total', mode = 'ALL_MODES'): Promise<PikaFetchResult> => {
-    const key = `pika:${username.toLowerCase()}:${interval}:${mode}`
-    dbg.ipc(`pika:fetch  user="${username}"  interval=${interval}  mode=${mode}`)
+  (
+    _,
+    username: string,
+    interval = 'total',
+    mode = 'ALL_MODES',
+  ): Promise<PikaFetchResult> => {
+    const key = `pika:${username.toLowerCase()}:${interval}:${mode}`;
+    dbg.ipc(`pika:fetch  user="${username}"  interval=${interval}  mode=${mode}`);
 
-    const cached = cache.get<PikaFetchResult>(key)
-    if (cached) return Promise.resolve(cached)
+    const cached = cache.get<PikaFetchResult>(key);
+    if (cached) return Promise.resolve(cached);
 
     return dedupe(key, async () => {
-      const cached2 = cache.get<PikaFetchResult>(key)
-      if (cached2) return cached2
+      const cached2 = cache.get<PikaFetchResult>(key);
+      if (cached2) return cached2;
 
-      const profileUrl = `${PIKA_BASE}/profile/${encodeURIComponent(username)}`
-      dbg.http(`pika:fetch profile request for "${username}"`)
+      const profileUrl = `${PIKA_BASE}/profile/${encodeURIComponent(username)}`;
+      dbg.http(`pika:fetch profile request for "${username}"`);
 
       const pRes = await pikaGet(profileUrl).catch((err) => {
-        dbg.error(`pika:fetch profile "${username}" — ${(err as Error).message}`)
-        return null
-      })
+        dbg.error(`pika:fetch profile "${username}" — ${(err as Error).message}`);
+        return null;
+      });
 
-      const notFound =
-        pRes !== null && (pRes.status === 404 || pRes.status === 400)
-      const rateLimit = pRes !== null && pRes.status === 429
+      const notFound = pRes !== null && (pRes.status === 404 || pRes.status === 400);
+      const rateLimit = pRes !== null && pRes.status === 429;
 
       if (notFound) {
-        dbg.ipc(`pika:fetch "${username}" → NOT FOUND`)
-        const result: PikaFetchResult = { profile: null, stats: null, notFound: true, rateLimit: false }
-        cache.set(key, result)
-        return result
+        dbg.ipc(`pika:fetch "${username}" → NOT FOUND`);
+        const result: PikaFetchResult = {
+          profile: null,
+          stats: null,
+          notFound: true,
+          rateLimit: false,
+        };
+        cache.set(key, result);
+        return result;
       }
 
       if (rateLimit) {
-        dbg.ipc(`pika:fetch "${username}" → RATE LIMITED`)
-        return { profile: null, stats: null, notFound: false, rateLimit: true }
+        dbg.ipc(`pika:fetch "${username}" → RATE LIMITED`);
+        return { profile: null, stats: null, notFound: false, rateLimit: true };
       }
 
-      const profile = pRes?.status === 200 ? pRes.data : null
+      const profile = pRes?.status === 200 ? pRes.data : null;
       const canonicalUsername =
-        (profile as { username?: string } | null)?.username ?? username
+        (profile as { username?: string } | null)?.username ?? username;
 
-      dbg.http(`pika:fetch stats request for canonical="${canonicalUsername}"`)
-      const statsUrl = `${PIKA_BASE}/profile/${encodeURIComponent(canonicalUsername)}/leaderboard?type=bedwars&interval=${interval}&mode=${mode}`
+      dbg.http(`pika:fetch stats request for canonical="${canonicalUsername}"`);
+      const statsUrl = `${PIKA_BASE}/profile/${encodeURIComponent(canonicalUsername)}/leaderboard?type=bedwars&interval=${interval}&mode=${mode}`;
 
       const sRes = await pikaGet(statsUrl).catch((err) => {
-        dbg.error(`pika:fetch stats "${canonicalUsername}" — ${(err as Error).message}`)
-        return null
-      })
+        dbg.error(`pika:fetch stats "${canonicalUsername}" — ${(err as Error).message}`);
+        return null;
+      });
 
-      const stats = sRes?.status === 200 ? sRes.data : null
+      const stats = sRes?.status === 200 ? sRes.data : null;
 
-      dbg.ipc(`pika:fetch "${canonicalUsername}" → OK  profile=${!!profile}  stats=${!!stats}`)
+      dbg.ipc(
+        `pika:fetch "${canonicalUsername}" → OK  profile=${!!profile}  stats=${!!stats}`,
+      );
 
-      const result: PikaFetchResult = { profile, stats, notFound: false, rateLimit: false }
-      cache.set(key, result)
-      return result
-    })
+      const result: PikaFetchResult = {
+        profile,
+        stats,
+        notFound: false,
+        rateLimit: false,
+      };
+      cache.set(key, result);
+      return result;
+    });
   },
-)
+);
 
 ipcMain.handle(
   'pika:stats',
   (_, username: string, interval: string, mode: string): Promise<unknown> => {
-    const key = `pika:stats:${username.toLowerCase()}:${interval}:${mode}`
-    dbg.ipc(`pika:stats  user="${username}"  interval=${interval}  mode=${mode}`)
+    const key = `pika:stats:${username.toLowerCase()}:${interval}:${mode}`;
+    dbg.ipc(`pika:stats  user="${username}"  interval=${interval}  mode=${mode}`);
 
-    const cached = cache.get<unknown>(key)
-    if (cached) return Promise.resolve(cached)
+    const cached = cache.get<unknown>(key);
+    if (cached) return Promise.resolve(cached);
 
     return dedupe(key, async () => {
-      const cached2 = cache.get<unknown>(key)
-      if (cached2) return cached2
+      const cached2 = cache.get<unknown>(key);
+      if (cached2) return cached2;
 
-      const profileUrl = `${PIKA_BASE}/profile/${encodeURIComponent(username)}`
-      dbg.http(`pika:stats profile request for "${username}"`)
+      const profileUrl = `${PIKA_BASE}/profile/${encodeURIComponent(username)}`;
+      dbg.http(`pika:stats profile request for "${username}"`);
 
       const pRes = await pikaGet(profileUrl).catch((err) => {
-        dbg.error(`pika:stats profile "${username}" — ${(err as Error).message}`)
-        return null
-      })
+        dbg.error(`pika:stats profile "${username}" — ${(err as Error).message}`);
+        return null;
+      });
 
-      const profile = pRes?.status === 200 ? pRes.data : null
+      const profile = pRes?.status === 200 ? pRes.data : null;
       const canonicalUsername =
-        (profile as { username?: string } | null)?.username ?? username
+        (profile as { username?: string } | null)?.username ?? username;
 
-      dbg.http(`pika:stats stats request for canonical="${canonicalUsername}"`)
-      const statsUrl = `${PIKA_BASE}/profile/${encodeURIComponent(canonicalUsername)}/leaderboard?type=bedwars&interval=${interval}&mode=${mode}`
+      dbg.http(`pika:stats stats request for canonical="${canonicalUsername}"`);
+      const statsUrl = `${PIKA_BASE}/profile/${encodeURIComponent(canonicalUsername)}/leaderboard?type=bedwars&interval=${interval}&mode=${mode}`;
 
       const sRes = await pikaGet(statsUrl).catch((err) => {
-        dbg.error(`pika:stats "${canonicalUsername}" — ${(err as Error).message}`)
-        return null
-      })
+        dbg.error(`pika:stats "${canonicalUsername}" — ${(err as Error).message}`);
+        return null;
+      });
 
-      const data = sRes?.status === 200 ? sRes.data : null
-      if (data) cache.set(key, data)
-      return data
-    })
+      const data = sRes?.status === 200 ? sRes.data : null;
+      if (data) cache.set(key, data);
+      return data;
+    });
   },
-)
+);
+
+ipcMain.handle('pika:clan', (_, name: string): Promise<unknown> => {
+  const key = `pika:clan:${name.toLowerCase()}`;
+  dbg.ipc(`pika:clan  name="${name}"`);
+
+  const cached = cache.get<unknown>(key);
+  if (cached) return Promise.resolve(cached);
+
+  return dedupe(key, async () => {
+    const cached2 = cache.get<unknown>(key);
+    if (cached2) return cached2;
+
+    const url = `${PIKA_BASE}/clans/${encodeURIComponent(name)}`;
+    dbg.http(`pika:clan request for "${name}"`);
+
+    const res = await pikaGet(url).catch((err) => {
+      dbg.error(`pika:clan "${name}" — ${(err as Error).message}`);
+      return null;
+    });
+
+    if (!res) throw new Error('Network error');
+    if (res.status === 404 || res.status === 400) return { notFound: true };
+    if (res.status !== 200) throw new Error(`HTTP ${res.status}`);
+
+    const data = res.data;
+    cache.set(key, data);
+    dbg.ipc(`pika:clan "${name}" → OK`);
+    return data;
+  });
+});
+
+ipcMain.handle('jartex:clan', (_, name: string): Promise<unknown> => {
+  const key = `jartex:clan:${name.toLowerCase()}`;
+  dbg.ipc(`jartex:clan  name="${name}"`);
+
+  const cached = cache.get<unknown>(key);
+  if (cached) return Promise.resolve(cached);
+
+  return dedupe(key, async () => {
+    const cached2 = cache.get<unknown>(key);
+    if (cached2) return cached2;
+
+    const url = `${JARTEX_BASE}/clans/${encodeURIComponent(name)}`;
+    dbg.http(`jartex:clan request for "${name}"`);
+
+    const res = await pikaGet(url).catch((err) => {
+      dbg.error(`jartex:clan "${name}" — ${(err as Error).message}`);
+      return null;
+    });
+
+    if (!res) throw new Error('Network error');
+    if (res.status === 404 || res.status === 400) return { notFound: true };
+    if (res.status !== 200) throw new Error(`HTTP ${res.status}`);
+
+    const data = res.data;
+    cache.set(key, data);
+    dbg.ipc(`jartex:clan "${name}" → OK`);
+    return data;
+  });
+});
+
+type JartexFetchResult = {
+  profile: unknown;
+  stats: unknown;
+  notFound: boolean;
+  rateLimit: boolean;
+};
+
+ipcMain.handle(
+  'jartex:fetch',
+  (
+    _,
+    username: string,
+    interval = 'total',
+    mode = 'ALL_MODES',
+  ): Promise<JartexFetchResult> => {
+    const key = `jartex:${username.toLowerCase()}:${interval}:${mode}`;
+    dbg.ipc(`jartex:fetch  user="${username}"  interval=${interval}  mode=${mode}`);
+
+    const cached = cache.get<JartexFetchResult>(key);
+    if (cached) return Promise.resolve(cached);
+
+    return dedupe(key, async () => {
+      const cached2 = cache.get<JartexFetchResult>(key);
+      if (cached2) return cached2;
+
+      const profileUrl = `${JARTEX_BASE}/profile/${encodeURIComponent(username)}`;
+      dbg.http(`jartex:fetch profile request for "${username}"`);
+
+      const pRes = await pikaGet(profileUrl).catch((err) => {
+        dbg.error(`jartex:fetch profile "${username}" — ${(err as Error).message}`);
+        return null;
+      });
+
+      const notFound = pRes !== null && (pRes.status === 404 || pRes.status === 400);
+      const rateLimit = pRes !== null && pRes.status === 429;
+
+      if (notFound) {
+        dbg.ipc(`jartex:fetch "${username}" → NOT FOUND`);
+        const result: JartexFetchResult = {
+          profile: null,
+          stats: null,
+          notFound: true,
+          rateLimit: false,
+        };
+        cache.set(key, result);
+        return result;
+      }
+
+      if (rateLimit) {
+        dbg.ipc(`jartex:fetch "${username}" → RATE LIMITED`);
+        return { profile: null, stats: null, notFound: false, rateLimit: true };
+      }
+
+      const profile = pRes?.status === 200 ? pRes.data : null;
+      const canonicalUsername =
+        (profile as { username?: string } | null)?.username ?? username;
+
+      dbg.http(`jartex:fetch stats request for canonical="${canonicalUsername}"`);
+      const statsUrl = `${JARTEX_BASE}/profile/${encodeURIComponent(canonicalUsername)}/leaderboard?type=bedwars&interval=${interval}&mode=${mode}`;
+
+      const sRes = await pikaGet(statsUrl).catch((err) => {
+        dbg.error(
+          `jartex:fetch stats "${canonicalUsername}" — ${(err as Error).message}`,
+        );
+        return null;
+      });
+
+      const stats = sRes?.status === 200 ? sRes.data : null;
+
+      dbg.ipc(
+        `jartex:fetch "${canonicalUsername}" → OK  profile=${!!profile}  stats=${!!stats}`,
+      );
+
+      const result: JartexFetchResult = {
+        profile,
+        stats,
+        notFound: false,
+        rateLimit: false,
+      };
+      cache.set(key, result);
+      return result;
+    });
+  },
+);
+
+ipcMain.handle(
+  'jartex:stats',
+  (_, username: string, interval: string, mode: string): Promise<unknown> => {
+    const key = `jartex:stats:${username.toLowerCase()}:${interval}:${mode}`;
+    dbg.ipc(`jartex:stats  user="${username}"  interval=${interval}  mode=${mode}`);
+
+    const cached = cache.get<unknown>(key);
+    if (cached) return Promise.resolve(cached);
+
+    return dedupe(key, async () => {
+      const cached2 = cache.get<unknown>(key);
+      if (cached2) return cached2;
+
+      const profileUrl = `${JARTEX_BASE}/profile/${encodeURIComponent(username)}`;
+      dbg.http(`jartex:stats profile request for "${username}"`);
+
+      const pRes = await pikaGet(profileUrl).catch((err) => {
+        dbg.error(`jartex:stats profile "${username}" — ${(err as Error).message}`);
+        return null;
+      });
+
+      const profile = pRes?.status === 200 ? pRes.data : null;
+      const canonicalUsername =
+        (profile as { username?: string } | null)?.username ?? username;
+
+      dbg.http(`jartex:stats stats request for canonical="${canonicalUsername}"`);
+      const statsUrl = `${JARTEX_BASE}/profile/${encodeURIComponent(canonicalUsername)}/leaderboard?type=bedwars&interval=${interval}&mode=${mode}`;
+
+      const sRes = await pikaGet(statsUrl).catch((err) => {
+        dbg.error(`jartex:stats "${canonicalUsername}" — ${(err as Error).message}`);
+        return null;
+      });
+
+      const data = sRes?.status === 200 ? sRes.data : null;
+      if (data) cache.set(key, data);
+      return data;
+    });
+  },
+);
+
+ipcMain.handle('skin:fetch', async (_, username: string) => {
+  const urls = [
+    `https://starlightskins.lunareclipse.studio/render/ultimate/${encodeURIComponent(username)}/full`,
+    `https://visage.surgeplay.com/full/512/${encodeURIComponent(username)}`,
+    `https://mc-heads.net/body/${encodeURIComponent(username)}/100`,
+  ];
+  for (const url of urls) {
+    try {
+      const r = await axios.get<ArrayBuffer>(url, {
+        timeout: 10000,
+        responseType: 'arraybuffer',
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        },
+        validateStatus: (s) => s === 200,
+        httpsAgent,
+      });
+      const buf = Buffer.from(r.data);
+      const ct = (r.headers['content-type'] as string | undefined) ?? 'image/png';
+      const mime = ct.split(';')[0].trim();
+      return `data:${mime};base64,${buf.toString('base64')}`;
+    } catch {}
+  }
+  return null;
+});
 
 ipcMain.handle('app:get-path', (_, name: string) =>
   app.getPath(name as Parameters<typeof app.getPath>[0]),
-)
+);
 
 ipcMain.handle('app:find-lunar-log', async (): Promise<string> => {
-  const home = app.getPath('home')
-  const candidates = [
+  const home = app.getPath('home');
+
+  const baseCandidates: string[] = [
     `${home}/.lunarclient/offline`,
     `${home}/.lunarclient/profiles/lunar`,
-  ]
-  const found: { path: string; mtime: number }[] = []
+  ];
 
-  for (const base of candidates) {
-    let versions: string[]
+  if (process.platform === 'win32') {
+    const roaming = app.getPath('appData');
+    const local = roaming.replace(/[Rr]oaming$/, 'Local');
+    baseCandidates.push(
+      `${local}/lunarclient/offline`,
+      `${local}/lunarclient/profiles/lunar`,
+    );
+  } else if (process.platform === 'darwin') {
+    const appSupport = app.getPath('appData');
+    baseCandidates.push(
+      `${appSupport}/lunarclient/offline`,
+      `${appSupport}/lunarclient/profiles/lunar`,
+    );
+  }
+
+  const found: { path: string; mtime: number }[] = [];
+
+  for (const base of baseCandidates) {
+    let versions: string[];
     try {
-      versions = await fs.promises.readdir(base)
+      versions = await fs.promises.readdir(base);
     } catch {
-      continue
+      continue;
     }
     for (const version of versions) {
-      const logPath = `${base}/${version}/logs/latest.log`
+      const logPath = `${base}/${version}/logs/latest.log`;
       try {
-        const stat = await fs.promises.stat(logPath)
-        if (stat.isFile()) found.push({ path: logPath, mtime: stat.mtimeMs })
+        const stat = await fs.promises.stat(logPath);
+        if (stat.isFile()) found.push({ path: logPath, mtime: stat.mtimeMs });
       } catch {
-        continue
+        continue;
       }
     }
   }
 
   if (found.length === 0) {
-    return `${home}/.lunarclient/offline/multiver/logs/latest.log`
+    return `${home}/.lunarclient/offline/multiver/logs/latest.log`;
   }
 
-  found.sort((a, b) => b.mtime - a.mtime)
-  dbg.ipc(`app:find-lunar-log → ${found[0].path}  (${found.length} candidates)`)
-  return found[0].path
-})
+  found.sort((a, b) => b.mtime - a.mtime);
+  dbg.ipc(`app:find-lunar-log → ${found[0].path}  (${found.length} candidates)`);
+  return found[0].path;
+});
 
 function stripMcColorCodes(line: string): string {
-  return line.replace(/[\u00A7\uFFFD][0-9A-FK-OR]/gi, '').replace(/[\u00A7\uFFFD]/g, '')
+  return line.replace(/[\u00A7\uFFFD][0-9A-FK-OR]/gi, '').replace(/[\u00A7\uFFFD]/g, '');
 }
 
-let logTail: TailFile | null = null
-let logRl: readline.Interface | null = null
-let restartTimer: NodeJS.Timeout | null = null
+let logTail: TailFile | null = null;
+let logRl: readline.Interface | null = null;
+let restartTimer: NodeJS.Timeout | null = null;
 
 async function stopTail(): Promise<void> {
   if (restartTimer) {
-    clearTimeout(restartTimer)
-    restartTimer = null
+    clearTimeout(restartTimer);
+    restartTimer = null;
   }
   if (logRl) {
-    logRl.close()
-    logRl = null
+    logRl.close();
+    logRl = null;
   }
   if (logTail) {
-    await logTail.quit().catch((err) => console.error('Error closing tail:', err))
-    logTail = null
+    await logTail.quit().catch((err) => console.error('Error closing tail:', err));
+    logTail = null;
   }
 }
 
 async function startTail(path: string): Promise<void> {
-  await stopTail()
+  await stopTail();
   try {
-    logTail = new TailFile(path, { pollFileIntervalMs: 1000 })
+    logTail = new TailFile(path, { pollFileIntervalMs: 250 });
     logTail.on('error', () => {
       if (!restartTimer) {
         restartTimer = setTimeout(() => {
           void (async () => {
-            restartTimer = null
+            restartTimer = null;
             if (logTail) {
               const readable = await fs.promises
                 .access(path, fs.constants.R_OK)
                 .then(() => true)
-                .catch(() => false)
-              if (readable) await startTail(path).catch(() => {})
-              else await stopTail()
+                .catch(() => false);
+              if (readable) await startTail(path).catch(() => {});
+              else await stopTail();
             }
-          })()
-        }, 2000)
+          })();
+        }, 2000);
       }
-    })
-    await logTail.start()
-    logRl = readline.createInterface({ input: logTail, crlfDelay: Infinity })
+    });
+    await logTail.start();
+    logRl = readline.createInterface({ input: logTail, crlfDelay: Infinity });
     logRl.on('line', (line) => {
-      const cleaned = stripMcColorCodes(line)
-      win?.webContents.send('log:line', cleaned)
-    })
-    dbg.ipc(`Log tail started: ${path}`)
+      const cleaned = stripMcColorCodes(line);
+      win?.webContents.send('log:line', cleaned);
+    });
+    dbg.ipc(`Log tail started: ${path}`);
   } catch (err) {
-    console.error('Failed to start log tail:', err)
+    console.error('Failed to start log tail:', err);
   }
 }
 
 ipcMain.on('log:set-path', (_, path: string | null) => {
   void (async () => {
     if (!path) {
-      await stopTail()
-      return
+      await stopTail();
+      return;
     }
-    await startTail(path)
-  })()
-})
+    await startTail(path);
+  })();
+});
 
 ipcMain.handle('log:check-path', (_, path: string) =>
   fs.promises
     .access(path, fs.constants.R_OK)
     .then(() => true)
     .catch(() => false),
-)
+);
 
 ipcMain.handle('log:open-dialog', () =>
   dialog.showOpenDialog(win!, {
     filters: [{ name: 'Minecraft Logs', extensions: ['log'] }],
     properties: ['openFile'],
   }),
-)
+);
 
 ipcMain.handle('app:open-image-dialog', () =>
   dialog.showOpenDialog(win!, {
     title: 'Choose Background Image',
-    filters: [{ name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp'] }],
+    filters: [
+      { name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp'] },
+    ],
     properties: ['openFile'],
   }),
-)
+);
 
 ipcMain.handle('app:read-file-base64', async (_, filePath: string) => {
-  const { readFile } = await import('fs/promises')
-  const { extname } = await import('path')
-  const ext = extname(filePath).slice(1).toLowerCase()
+  const { readFile } = await import('fs/promises');
+  const { extname } = await import('path');
+  const ext = extname(filePath).slice(1).toLowerCase();
   const mimeMap: Record<string, string> = {
     png: 'image/png',
     jpg: 'image/jpeg',
@@ -525,108 +859,107 @@ ipcMain.handle('app:read-file-base64', async (_, filePath: string) => {
     gif: 'image/gif',
     webp: 'image/webp',
     bmp: 'image/bmp',
-  }
-  const mime = mimeMap[ext] ?? 'image/png'
-  const data = await readFile(filePath)
-  return `data:${mime};base64,${data.toString('base64')}`
-})
+  };
+  const mime = mimeMap[ext] ?? 'image/png';
+  const data = await readFile(filePath);
+  return `data:${mime};base64,${data.toString('base64')}`;
+});
 
-const registeredShortcuts = new Set<string>()
+const registeredShortcuts = new Set<string>();
 
 ipcMain.handle('shortcuts:register', (_, shortcuts: string[]) => {
   for (const s of registeredShortcuts) {
-    globalShortcut.unregister(s)
-    registeredShortcuts.delete(s)
+    globalShortcut.unregister(s);
+    registeredShortcuts.delete(s);
   }
   for (const s of shortcuts.filter(Boolean)) {
     try {
-      globalShortcut.register(s, () => win?.webContents.send('shortcut:fired', s))
-      registeredShortcuts.add(s)
-    } catch {
-      /* invalid shortcut string */
-    }
+      globalShortcut.register(s, () => win?.webContents.send('shortcut:fired', s));
+      registeredShortcuts.add(s);
+    } catch {}
   }
-})
+});
 
-const RPC_APP_ID = '1487763608820781096'
+const RPC_APP_ID = '1487763608820781096';
 
-let rpcClient: unknown = null
-let rpcConnected = false
-let rpcRetryTimer: NodeJS.Timeout | null = null
-let rpcIsActive = false
+let rpcClient: unknown = null;
+let rpcConnected = false;
+let rpcRetryTimer: NodeJS.Timeout | null = null;
+let rpcIsActive = false;
+let rpcCurrentNetwork = 'pikanetwork';
 
 type RpcClientInstance = {
-  on(event: string, cb: () => void): void
-  login(opts: { clientId: string }): Promise<void>
-  setActivity(opts: object): Promise<void>
-  destroy(): Promise<void>
-  user?: { username?: string }
-}
+  on(event: string, cb: () => void): void;
+  login(opts: { clientId: string }): Promise<void>;
+  setActivity(opts: object): Promise<void>;
+  destroy(): Promise<void>;
+  user?: { username?: string };
+};
 
 async function destroyRPC(): Promise<void> {
   if (rpcRetryTimer) {
-    clearTimeout(rpcRetryTimer)
-    rpcRetryTimer = null
+    clearTimeout(rpcRetryTimer);
+    rpcRetryTimer = null;
   }
   if (rpcClient) {
     try {
-      await (rpcClient as RpcClientInstance).destroy()
-    } catch {
-      /* ignore */
-    }
-    rpcClient = null
-    rpcConnected = false
-    dbg.rpc('Discord RPC destroyed')
+      await (rpcClient as RpcClientInstance).destroy();
+    } catch {}
+    rpcClient = null;
+    rpcConnected = false;
+    dbg.rpc('Discord RPC destroyed');
   }
 }
 
 async function initRPC(): Promise<void> {
-  if (rpcConnected) return
-  await destroyRPC()
+  if (rpcConnected) return;
+  await destroyRPC();
 
   try {
-    const { Client } = await import('discord-rpc').catch(() => ({ Client: null }))
+    const { Client } = await import('discord-rpc').catch(() => ({ Client: null }));
     if (!Client) {
-      dbg.rpc('discord-rpc module not found — skipping RPC')
-      return
+      dbg.rpc('discord-rpc module not found — skipping RPC');
+      return;
     }
 
-    rpcClient = new Client({ transport: 'ipc' }) as RpcClientInstance
-    const client = rpcClient as RpcClientInstance
+    rpcClient = new Client({ transport: 'ipc' }) as RpcClientInstance;
+    const client = rpcClient as RpcClientInstance;
 
     client.on('ready', () => {
-      rpcConnected = true
-      dbg.rpc(`Connected as ${client.user?.username ?? 'unknown'}`)
-      applyRPCActivity()
-    })
+      rpcConnected = true;
+      dbg.rpc(`Connected as ${client.user?.username ?? 'unknown'}`);
+      applyRPCActivity();
+    });
 
     client.on('disconnected', () => {
-      rpcConnected = false
-      dbg.rpc('Disconnected — will retry in 15s')
+      rpcConnected = false;
+      dbg.rpc('Disconnected — will retry in 15s');
       if (!rpcRetryTimer) {
         rpcRetryTimer = setTimeout(() => {
-          rpcRetryTimer = null
-          initRPC().catch(() => {})
-        }, 15_000)
+          rpcRetryTimer = null;
+          initRPC().catch(() => {});
+        }, 15_000);
       }
-    })
+    });
 
-    await client.login({ clientId: RPC_APP_ID })
+    await client.login({ clientId: RPC_APP_ID });
   } catch (err) {
-    dbg.rpc(`Init failed: ${(err as Error).message} — will retry in 15s`)
+    dbg.rpc(`Init failed: ${(err as Error).message} — will retry in 15s`);
     if (!rpcRetryTimer) {
       rpcRetryTimer = setTimeout(() => {
-        rpcRetryTimer = null
-        initRPC().catch(() => {})
-      }, 15_000)
+        rpcRetryTimer = null;
+        initRPC().catch(() => {});
+      }, 15_000);
     }
   }
 }
 
 function applyRPCActivity(): void {
-  if (!rpcClient || !rpcConnected) return
-  const client = rpcClient as RpcClientInstance
-  const details = rpcIsActive ? 'Playing on PikaNetwork' : 'Idle'
+  if (!rpcClient || !rpcConnected) return;
+  const client = rpcClient as RpcClientInstance;
+  const networkLabel =
+    rpcCurrentNetwork === 'jartexnetwork' ? 'JartexNetwork' : 'PikaNetwork';
+  const details = rpcIsActive ? `Playing on ${networkLabel}` : 'Idle';
   client
     .setActivity({
       details,
@@ -634,82 +967,94 @@ function applyRPCActivity(): void {
       largeImageText: 'THEBOIS Overlay',
       instance: false,
     })
-    .catch((err: Error) => dbg.rpc(`setActivity error: ${err.message}`))
+    .catch((err: Error) => dbg.rpc(`setActivity error: ${err.message}`));
 }
 
 ipcMain.handle('rpc:init', async () => {
-  dbg.rpc('rpc:init called')
-  await initRPC()
-})
+  dbg.rpc('rpc:init called');
+  await initRPC();
+});
 
 ipcMain.on('rpc:set-enabled', (_, enabled: boolean) => {
   void (async () => {
-    dbg.rpc(`rpc:set-enabled  enabled=${enabled}`)
-    if (enabled) await initRPC()
-    else await destroyRPC()
-  })()
-})
+    dbg.rpc(`rpc:set-enabled  enabled=${enabled}`);
+    if (enabled) await initRPC();
+    else await destroyRPC();
+  })();
+});
 
 ipcMain.on('rpc:set-active', (_, active: boolean) => {
-  dbg.rpc(`rpc:set-active  active=${active}`)
-  rpcIsActive = active
-  applyRPCActivity()
-})
+  dbg.rpc(`rpc:set-active  active=${active}`);
+  rpcIsActive = active;
+  applyRPCActivity();
+});
 
-ipcMain.on('rpc:update', () => {})
+ipcMain.on('rpc:set-network', (_, network: string) => {
+  dbg.rpc(`rpc:set-network  network=${network}`);
+  rpcCurrentNetwork = network;
+  applyRPCActivity();
+});
+
+ipcMain.on('rpc:update', () => {});
 
 ipcMain.on('rpc:destroy', () => {
-  void destroyRPC()
-})
+  void destroyRPC();
+});
 
-autoUpdater.autoDownload = true
-autoUpdater.autoInstallOnAppQuit = true
+autoUpdater.autoDownload = true;
+autoUpdater.autoInstallOnAppQuit = true;
 
 autoUpdater.on('checking-for-update', () =>
   win?.webContents.send('updater:status', { status: 'checking' }),
-)
+);
 autoUpdater.on('update-not-available', () =>
   win?.webContents.send('updater:status', { status: 'up-to-date' }),
-)
+);
 autoUpdater.on('update-available', (info) =>
   win?.webContents.send('updater:status', { status: 'available', version: info.version }),
-)
+);
 autoUpdater.on('download-progress', (p) =>
   win?.webContents.send('updater:status', {
     status: 'downloading',
     percent: Math.round(p.percent),
   }),
-)
+);
 autoUpdater.on('update-downloaded', (info) => {
-  win?.webContents.send('updater:status', { status: 'downloaded', version: info.version })
-  setTimeout(() => autoUpdater.quitAndInstall(true, true), 3_000)
-})
+  win?.webContents.send('updater:status', {
+    status: 'downloaded',
+    version: info.version,
+  });
+  setTimeout(() => autoUpdater.quitAndInstall(true, true), 3_000);
+});
 autoUpdater.on('error', (err) =>
   win?.webContents.send('updater:status', { status: 'error', error: err.message }),
-)
+);
 
 ipcMain.on('updater:check', () => {
   if (is.dev) {
-    dbg.ipc('updater:check skipped in dev mode')
-    win?.webContents.send('updater:status', { status: 'dev' })
-    return
+    dbg.ipc('updater:check skipped in dev mode');
+    win?.webContents.send('updater:status', { status: 'dev' });
+    return;
   }
-  dbg.ipc('updater:check — checking for updates')
+  dbg.ipc('updater:check — checking for updates');
   autoUpdater.checkForUpdates().catch((err) => {
-    dbg.error(`autoUpdater.checkForUpdates failed: ${(err as Error).message}`)
-  })
-})
+    dbg.error(`autoUpdater.checkForUpdates failed: ${(err as Error).message}`);
+  });
+});
 
 ipcMain.on('updater:install', () => {
-  dbg.ipc('updater:install — quitting and installing (silent)')
-  autoUpdater.quitAndInstall(true, true)
-})
+  dbg.ipc('updater:install — quitting and installing (silent)');
+  autoUpdater.quitAndInstall(true, true);
+});
 
 app.on('will-quit', () => {
   void (async () => {
-    for (const s of registeredShortcuts) globalShortcut.unregister(s)
-    await stopTail()
-    await destroyRPC()
-    cache.clear()
-  })()
-})
+    stopLinuxCursorPoll();
+    for (const s of registeredShortcuts) globalShortcut.unregister(s);
+    await stopTail();
+    await destroyRPC();
+    cache.clear();
+    httpAgent.destroy();
+    httpsAgent.destroy();
+  })();
+});

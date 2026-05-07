@@ -1,25 +1,43 @@
-import { test } from '@playwright/test'
-import { _electron as electron } from 'playwright'
-import path from 'path'
-import fs from 'fs'
+import { test } from '@playwright/test';
+import fs from 'fs';
+import path from 'path';
+import { _electron as electron } from 'playwright';
 
-const PLAYERS = [
+const PIKA_PLAYERS = [
   'voodootje0',
   'JustThiemo',
   'Arrly',
   '_Luanne',
-  'Sanivu',
-  'arham19',
-  'hxml',
-  'Mefity',
+  'Ehtne',
+  'Darnly',
+  'Vaitren',
+  'tobin',
   'loxamy',
-  'Abdomen',
+  'meoweys',
   'resuns',
   'izoo_',
   'Si1ent_',
   'Hiqhest',
   'IStayKittens',
-]
+];
+
+const JARTEX_PLAYERS = [
+  'Si1ent_',
+  'Sandy07',
+  'DARKpeveresh',
+  'meelb',
+  'Lexi58',
+  'Faoloe',
+  'Weeder',
+  'Djim',
+  'Stxrs',
+  'bene_e',
+  'JustThiemo',
+  'iFlyYT',
+  'voodootje0',
+  'climbby',
+  'IStayKittens',
+];
 
 const ALL_COLUMNS = [
   'NAME',
@@ -37,9 +55,9 @@ const ALL_COLUMNS = [
   'BBLR',
   'WIN_STREAK',
   'PLAYED',
-]
+];
 
-const CONFIG_SEED = {
+const BASE_CONFIG_SEED = {
   activeColumns: ALL_COLUMNS,
   columnLabels: 'FULL',
   sortBy: 'NAME',
@@ -87,16 +105,18 @@ const CONFIG_SEED = {
       rankVip: '#55FF55',
     },
   },
-}
+};
 
 const NICKS_SEED = {
   nicks: [{ id: 'showcase-nick-1', nick: 'IStayKittens', realName: 'harshil_mc' }],
-}
+};
 
-test.setTimeout(180_000)
-
-test('capture showcase', async () => {
-  const mainEntry = path.join(__dirname, '..', 'out', 'main', 'index.js')
+async function captureShowcase(
+  players: string[],
+  configSeed: Record<string, unknown>,
+  outputFilename: string,
+): Promise<void> {
+  const mainEntry = path.join(__dirname, '..', 'out', 'main', 'index.js');
 
   const app = await electron.launch({
     args: [mainEntry],
@@ -104,147 +124,156 @@ test('capture showcase', async () => {
       ...process.env,
       ELECTRON_ENABLE_LOGGING: '0',
     },
-  })
+  });
 
   try {
-    const page = await app.firstWindow()
-    
+    const page = await app.firstWindow();
+
     await app.evaluate(({ BrowserWindow }) => {
-      const [win] = BrowserWindow.getAllWindows()
-      win.setContentSize(1400, 800)
-    })
+      const [win] = BrowserWindow.getAllWindows();
+      win.setContentSize(1400, 800);
+    });
 
     await page.evaluate(
       ({ cfg, nicks }) => {
-        localStorage.setItem('thebois-config', JSON.stringify(cfg))
-        localStorage.setItem('nicks', JSON.stringify(nicks))
+        localStorage.setItem('thebois-config', JSON.stringify(cfg));
+        localStorage.setItem('nicks', JSON.stringify(nicks));
       },
-      { cfg: CONFIG_SEED, nicks: NICKS_SEED },
-    )
+      { cfg: configSeed, nicks: NICKS_SEED },
+    );
 
-    await page.reload({ waitUntil: 'domcontentloaded' })
+    await page.reload({ waitUntil: 'domcontentloaded' });
 
-    await page.waitForSelector('header', { timeout: 15_000 })
+    await page.waitForSelector('header', { timeout: 15_000 });
 
-    await page.waitForFunction(() => (window as any).__pinia !== undefined, { timeout: 10000 })
+    await page.waitForFunction(() => (window as any).__pinia !== undefined, {
+      timeout: 10000,
+    });
 
-    // Suppress the "log not configured" banner by setting logPathValid to null
     await page.evaluate(() => {
-      const pinia = (window as any).__pinia
-      const state = pinia.state?.value
-      if (state?.players) state.players.logPathValid = null
-    })
+      const pinia = (window as any).__pinia;
+      const state = pinia.state?.value;
+      if (state?.players) state.players.logPathValid = null;
+    });
 
-    await page.evaluate(async (names: string[]) => {
-      const pinia = (window as any).__pinia
-      if (!pinia) throw new Error('[showcase] window.__pinia not found')
-      const state = pinia.state?.value
+    const network = (configSeed.network as string) ?? 'pikanetwork';
 
-      for (const name of names) {
-        state.players.players.push({
-          name,
-          realName: name,
-          uuid: null,
-          loading: true,
-          error: null,
-          nicked: false,
-          profile: null,
-          stats: null,
-          source: 'manual' as const,
-        })
-      }
+    await page.evaluate(
+      async ({ names, net }: { names: string[]; net: string }) => {
+        const pinia = (window as any).__pinia;
+        if (!pinia) throw new Error('[showcase] window.__pinia not found');
+        const state = pinia.state?.value;
+        const api = net === 'jartexnetwork' ? window.api.jartex : window.api.pika;
 
-      await Promise.allSettled(
-        names.map(async (username, i) => {
-          await new Promise((r) => setTimeout(r, i * 350))
+        for (const name of names) {
+          state.players.players.push({
+            name,
+            realName: name,
+            uuid: null,
+            loading: true,
+            error: null,
+            nicked: false,
+            profile: null,
+            stats: null,
+            source: 'manual' as const,
+          });
+        }
 
-          try {
-            const result = await window.api.pika.fetch(username, 'total', 'ALL_MODES')
-            const idx = state.players.players.findIndex(
-              (p: any) => p.realName.toLowerCase() === username.toLowerCase(),
-            )
-            if (idx === -1) return
+        await Promise.allSettled(
+          names.map(async (username, i) => {
+            await new Promise((r) => setTimeout(r, i * 350));
 
-            const p = state.players.players[idx]
-            if (result.notFound) {
-              p.nicked = true
-              if (!p.profile && !p.stats) p.error = 'not_found'
-            } else if (result.rateLimit) {
-              p.error = 'rate_limited'
-            } else {
-              p.profile = result.profile
-              p.stats = result.stats
-              const apiName = (result.profile as any)?.username
-              if (apiName) {
-                p.name = apiName
-                p.realName = apiName
+            try {
+              const result = await api.fetch(username, 'total', 'ALL_MODES');
+              const idx = state.players.players.findIndex(
+                (p: any) => p.realName.toLowerCase() === username.toLowerCase(),
+              );
+              if (idx === -1) return;
+
+              const p = state.players.players[idx];
+              if (result.notFound) {
+                p.nicked = true;
+                if (!p.profile && !p.stats) p.error = 'not_found';
+              } else if (result.rateLimit) {
+                p.error = 'rate_limited';
+              } else {
+                p.profile = result.profile;
+                p.stats = result.stats;
+                const apiName = (result.profile as any)?.username;
+                if (apiName) {
+                  p.name = apiName;
+                  p.realName = apiName;
+                }
+              }
+              p.loading = false;
+            } catch {
+              const idx = state.players.players.findIndex(
+                (p: any) => p.realName.toLowerCase() === username.toLowerCase(),
+              );
+              if (idx !== -1) {
+                state.players.players[idx].loading = false;
+                state.players.players[idx].error = 'network';
               }
             }
-            p.loading = false
-          } catch {
-            const idx = state.players.players.findIndex(
-              (p: any) => p.realName.toLowerCase() === username.toLowerCase(),
-            )
-            if (idx !== -1) {
-              state.players.players[idx].loading = false
-              state.players.players[idx].error = 'network'
-            }
-          }
-        }),
-      )
-    }, PLAYERS)
+          }),
+        );
+      },
+      { names: players, net: network },
+    );
 
     await page.waitForFunction(
       (count) => {
-        const rows = document.querySelectorAll('tbody tr')
-        return rows.length >= count
+        const rows = document.querySelectorAll('tbody tr');
+        return rows.length >= count;
       },
-      PLAYERS.length,
+      players.length,
       { timeout: 10_000 },
-    )
+    );
 
-    await page.waitForTimeout(800)
+    await page.waitForTimeout(800);
 
-    // Set a wide window so nothing wraps, then measure what's actually needed
     await app.evaluate(({ BrowserWindow }) => {
-      const [win] = BrowserWindow.getAllWindows()
-      win.setContentSize(2000, 800)
-    })
+      const [win] = BrowserWindow.getAllWindows();
+      win.setContentSize(2000, 800);
+    });
 
-    await page.waitForTimeout(300)
+    await page.waitForTimeout(300);
 
-    const { contentW, contentH } = await page.evaluate((): { contentW: number; contentH: number } => {
-      const titleBar = document.querySelector('header')?.offsetHeight ?? 42
-      const thead = document.querySelector('thead') as HTMLElement | null
-      const tbody = document.querySelector('tbody') as HTMLElement | null
-      const footer = document.querySelector('.border-t') as HTMLElement | null
+    const { contentW, contentH } = await page.evaluate(
+      (): { contentW: number; contentH: number } => {
+        const titleBar = document.querySelector('header')?.offsetHeight ?? 42;
+        const thead = document.querySelector('thead') as HTMLElement | null;
+        const tbody = document.querySelector('tbody') as HTMLElement | null;
+        const footer = document.querySelector('.border-t') as HTMLElement | null;
 
-      const theadH = thead?.offsetHeight ?? 35
-      const tbodyH = tbody?.scrollHeight ?? 0
-      const footerH = footer?.offsetHeight ?? 34
+        const theadH = thead?.offsetHeight ?? 35;
+        const tbodyH = tbody?.scrollHeight ?? 0;
+        const footerH = footer?.offsetHeight ?? 34;
 
-      // scrollWidth of body = full rendered width including all columns
-      const w = document.body.scrollWidth
+        const w = document.body.scrollWidth;
 
-      return {
-        contentW: w,
-        contentH: titleBar + theadH + tbodyH + footerH + 20,
-      }
-    })
+        return {
+          contentW: w,
+          contentH: titleBar + theadH + tbodyH + footerH + 20,
+        };
+      },
+    );
 
-    await app.evaluate(({ BrowserWindow }, { w, h }) => {
-      const [win] = BrowserWindow.getAllWindows()
-      win.setContentSize(w, h)
-    }, { w: contentW, h: contentH })
+    await app.evaluate(
+      ({ BrowserWindow }, { w, h }) => {
+        const [win] = BrowserWindow.getAllWindows();
+        win.setContentSize(w, h);
+      },
+      { w: contentW, h: contentH },
+    );
 
-    await page.waitForTimeout(400)
+    await page.waitForTimeout(400);
 
-    const outDir = path.join(__dirname, '..', 'assets')
-    fs.mkdirSync(outDir, { recursive: true })
-    const outPath = path.join(outDir, 'showcase.png')
+    const outDir = path.join(__dirname, '..', 'assets');
+    fs.mkdirSync(outDir, { recursive: true });
 
     await page.screenshot({
-      path: outPath,
+      path: path.join(outDir, outputFilename),
       fullPage: false,
       clip: {
         x: 0,
@@ -252,10 +281,26 @@ test('capture showcase', async () => {
         width: contentW,
         height: contentH,
       },
-    })
-
-    console.log(`Screenshot saved → ${outPath}`)
+    });
   } finally {
-    await app.close()
+    await app.close();
   }
-})
+}
+
+test.setTimeout(180_000);
+
+test('capture pika showcase', async () => {
+  await captureShowcase(
+    PIKA_PLAYERS,
+    { ...BASE_CONFIG_SEED, network: 'pikanetwork' },
+    'showcase-pika.png',
+  );
+});
+
+test('capture jartex showcase', async () => {
+  await captureShowcase(
+    JARTEX_PLAYERS,
+    { ...BASE_CONFIG_SEED, network: 'jartexnetwork' },
+    'showcase-jartex.png',
+  );
+});

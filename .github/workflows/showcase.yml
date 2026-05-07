@@ -5,14 +5,15 @@ on:
   push:
     branches: [main, master]
     paths-ignore:
-      - 'assets/showcase.png'
+      - 'assets/showcase-pika.png'
+      - 'assets/showcase-jartex.png'
 
 permissions:
   contents: write
 
 jobs:
   showcase:
-    name: Capture & Commit Showcase
+    name: Capture & Commit Showcases
     runs-on: ubuntu-latest
 
     steps:
@@ -52,7 +53,7 @@ jobs:
       - name: Build app (development mode)
         run: NODE_ENV=development npx electron-vite build --mode development
 
-      - name: Capture showcase screenshot
+      - name: Capture showcase screenshots
         run: |
           xvfb-run --auto-servernum --server-args="-screen 0 1920x1080x24" \
             npx playwright test e2e/showcase.spec.ts --reporter=line
@@ -60,12 +61,12 @@ jobs:
           DISPLAY: :99
           CI: true
 
-      - name: Commit screenshot to repo
+      - name: Commit screenshots to repo
         run: |
           mkdir -p assets
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add assets/showcase.png
+          git add assets/showcase-pika.png assets/showcase-jartex.png
           git diff --staged --quiet || \
-            git commit -m "chore: update showcase screenshot [skip ci]"
+            git commit -m "chore: update showcase screenshots [skip ci]"
           git push

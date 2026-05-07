@@ -1,14 +1,27 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { useConfigStore } from '@renderer/store/config'
-import { Column, COLUMNS } from '@renderer/types'
-import ToggleSetting from '@renderer/components/ToggleSetting.vue'
-import SliderSetting from '@renderer/components/SliderSetting.vue'
-import ShortcutInput from '@renderer/components/ShortcutInput.vue'
-import Section from '@renderer/components/SettingsSection.vue'
+import Section from '@renderer/components/SettingsSection.vue';
+import ShortcutInput from '@renderer/components/ShortcutInput.vue';
+import ToggleSetting from '@renderer/components/ToggleSetting.vue';
+import { useConfigStore } from '@renderer/store/config';
+import { usePlayersStore } from '@renderer/store/players';
+import { Column, COLUMNS, type Network, NETWORKS } from '@renderer/types';
+import {
+  ArrowDown,
+  ArrowUp,
+  ArrowUpDown,
+  Columns3,
+  Download,
+  Keyboard,
+  Palette,
+  RefreshCw,
+  Sliders,
+  X,
+} from 'lucide-vue-next';
+import { computed, onMounted, onUnmounted, ref } from 'vue';
 
-const config = useConfigStore()
-const activeTab = ref('appearance')
+const config = useConfigStore();
+const players = usePlayersStore();
+const activeTab = ref('appearance');
 
 type UpdateStatus =
   | 'idle'
@@ -18,157 +31,163 @@ type UpdateStatus =
   | 'available'
   | 'downloading'
   | 'downloaded'
-  | 'error'
-const updateStatus = ref<UpdateStatus>('idle')
-const updateVersion = ref('')
-const updatePercent = ref(0)
-const updateError = ref('')
+  | 'error';
+const updateStatus = ref<UpdateStatus>('idle');
+const updateVersion = ref('');
+const updatePercent = ref(0);
+const updateError = ref('');
 
 const updateStatusText = computed(() => {
   switch (updateStatus.value) {
     case 'dev':
-      return 'Updates disabled in dev mode'
+      return 'Updates disabled in dev mode';
     case 'checking':
-      return 'Checking for updates...'
+      return 'Checking for updates…';
     case 'up-to-date':
-      return 'You are on the latest version'
+      return 'You are on the latest version';
     case 'available':
-      return `Update available: v${updateVersion.value}`
+      return `Update available: v${updateVersion.value}`;
     case 'downloading':
-      return `Downloading... ${updatePercent.value}%`
+      return `Downloading… ${updatePercent.value}%`;
     case 'downloaded':
-      return `v${updateVersion.value} downloaded`
+      return `v${updateVersion.value} ready to install`;
     case 'error':
-      return `Update error: ${updateError.value}`
+      return `Error: ${updateError.value}`;
     default:
-      return 'Click to check for updates'
+      return 'Check for updates';
   }
-})
+});
 
 function checkUpdate(): void {
-  window.api.updater.check()
+  window.api.updater.check();
 }
-
 function installUpdate(): void {
-  window.api.updater.install()
+  window.api.updater.install();
 }
 
-let unsubUpdater: (() => void) | null = null
-
+let unsubUpdater: (() => void) | null = null;
 onMounted(() => {
   unsubUpdater = window.api.updater.onStatus((payload) => {
-    updateStatus.value = payload.status as UpdateStatus
-    if (payload.version) updateVersion.value = payload.version
-    if (payload.percent !== undefined) updatePercent.value = payload.percent
-    if (payload.error) updateError.value = payload.error
-  })
-})
-
+    updateStatus.value = payload.status as UpdateStatus;
+    if (payload.version) updateVersion.value = payload.version;
+    if (payload.percent !== undefined) updatePercent.value = payload.percent;
+    if (payload.error) updateError.value = payload.error;
+  });
+});
 onUnmounted(() => {
-  unsubUpdater?.()
-})
+  unsubUpdater?.();
+});
 
 const TABS = [
-  {
-    id: 'appearance',
-    label: 'Appearance',
-    iconPath:
-      'M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 0-.83.67-1.5 1.5-1.5H16c2.76 0 5-2.24 5-5 0-4.42-4.03-8-9-8zm-5.5 9c-.83 0-1.5-.67-1.5-1.5S5.67 9 6.5 9 8 9.67 8 10.5 7.33 12 6.5 12zm3-4C8.67 8 8 7.33 8 6.5S8.67 5 9.5 5s1.5.67 1.5 1.5S10.33 8 9.5 8zm5 0c-.83 0-1.5-.67-1.5-1.5S13.67 5 14.5 5s1.5.67 1.5 1.5S15.33 8 14.5 8zm3 4c-.83 0-1.5-.67-1.5-1.5S16.67 9 17.5 9s1.5.67 1.5 1.5-.67 1.5-1.5 1.5z',
-  },
-  {
-    id: 'columns',
-    label: 'Columns',
-    iconPath:
-      'M3 5h8V3H3v2zm0 8h8v-2H3v2zm0 8h8v-2H3v2zm10-8h8v-2h-8v2zm0 8h8v-2h-8v2zm0-16v2h8V5h-8z',
-  },
-  { id: 'sorting', label: 'Sorting', iconPath: 'M3 18h6v-2H3v2zM3 6v2h18V6H3zm0 7h12v-2H3v2z' },
-  {
-    id: 'shortcuts',
-    label: 'Shortcuts',
-    iconPath:
-      'M20 5H4c-1.1 0-1.99.9-1.99 2L2 17c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm-9 3h2v2h-2V8zm0 3h2v2h-2v-2zM8 8h2v2H8V8zm0 3h2v2H8v-2zm-1 5H5v-2h2v2zm9 0H8v-2h8v2zm0-3h-2v-2h2v2zm0-3h-2V8h2v2zm3 6h-2v-2h2v2zm0-3h-2v-2h2v2zm0-3h-2V8h2v2z',
-  },
-  {
-    id: 'advanced',
-    label: 'Advanced',
-    iconPath:
-      'M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z',
-  },
-]
+  { id: 'appearance', label: 'Appearance', icon: Palette },
+  { id: 'columns', label: 'Columns', icon: Columns3 },
+  { id: 'sorting', label: 'Sorting', icon: ArrowUpDown },
+  { id: 'shortcuts', label: 'Shortcuts', icon: Keyboard },
+  { id: 'advanced', label: 'Advanced', icon: Sliders },
+];
 
-const ALL_COLUMNS = Object.values(Column)
-const SORTABLE_COLUMNS = computed(() => ALL_COLUMNS.filter((c) => COLUMNS[c]?.sortable === true))
-
+const ALL_COLUMNS = Object.values(Column);
+const SORTABLE_COLUMNS = computed(() =>
+  ALL_COLUMNS.filter((c) => COLUMNS[c]?.sortable === true),
+);
 const inactiveColumns = computed(() => {
-  if (!config.activeColumns) return []
-  return ALL_COLUMNS.filter((c) => !config.activeColumns.includes(c))
-})
+  if (!config.activeColumns) return [];
+  return ALL_COLUMNS.filter((c) => !config.activeColumns.includes(c));
+});
 
 function toggleColumn(col: Column): void {
-  const idx = config.activeColumns.indexOf(col)
-  if (idx === -1) {
-    config.activeColumns.push(col)
-  } else if (config.activeColumns.length > 1) {
-    config.activeColumns.splice(idx, 1)
-  }
+  const idx = config.activeColumns.indexOf(col);
+  if (idx === -1) config.activeColumns.push(col);
+  else if (config.activeColumns.length > 1) config.activeColumns.splice(idx, 1);
 }
 
 function moveColumn(idx: number, dir: -1 | 1): void {
-  const cols = [...config.activeColumns]
-  const swapIdx = idx + dir
-  if (swapIdx < 0 || swapIdx >= cols.length) return
-  ;[cols[idx], cols[swapIdx]] = [cols[swapIdx], cols[idx]]
-  config.activeColumns = cols
+  const cols = [...config.activeColumns];
+  const swapIdx = idx + dir;
+  if (swapIdx < 0 || swapIdx >= cols.length) return;
+  [cols[idx], cols[swapIdx]] = [cols[swapIdx], cols[idx]];
+  config.activeColumns = cols;
 }
 
 async function onShortcutChange(
   key: 'shortcutMinimize' | 'shortcutClearPlayers',
   value: string,
 ): Promise<void> {
-  config[key] = value
-  await window.api.shortcuts.register([config.shortcutMinimize, config.shortcutClearPlayers])
+  config[key] = value;
+  await window.api.shortcuts.register([
+    config.shortcutMinimize,
+    config.shortcutClearPlayers,
+  ]);
 }
+
+function onNetworkChange(net: Network): void {
+  if (config.network === net) return;
+  config.network = net;
+  window.api.rpc.setNetwork(net);
+  players.clear();
+}
+
+const NETWORK_COLORS: Record<Network, string> = {
+  pikanetwork: '#ffea00',
+  jartexnetwork: '#06b6d4',
+};
 </script>
 
 <template>
-  <div class="flex h-full overflow-hidden" style="pointer-events: all">
-    <!-- Sidebar -->
+  <div
+    class="flex h-full overflow-hidden"
+    style="pointer-events: all"
+  >
     <aside
-      class="shrink-0 flex flex-col gap-0.5 p-2 border-r overflow-y-auto themed-scroll"
-      style="width: 132px; border-color: var(--color-border)"
+      class="themed-scroll flex shrink-0 flex-col overflow-y-auto border-r py-2"
+      style="
+        width: 128px;
+        border-color: var(--color-border);
+        background: rgba(255, 255, 255, 0.012);
+      "
     >
-      <button
-        v-for="tab in TABS"
-        :key="tab.id"
-        class="flex items-center gap-2 px-2.5 py-2 rounded-lg text-xs text-left transition-colors"
-        :style="
-          activeTab === tab.id
-            ? 'background: var(--color-accent-dim); color: var(--color-accent-light);'
-            : 'color: var(--color-ink-2);'
-        "
-        @click="activeTab = tab.id"
-      >
-        <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" class="shrink-0">
-          <path :d="tab.iconPath" />
-        </svg>
-        {{ tab.label }}
-      </button>
+      <div class="flex flex-col gap-0.5 px-2">
+        <button
+          v-for="tab in TABS"
+          :key="tab.id"
+          class="relative flex items-center gap-2.5 rounded-md px-2.5 py-2.5 text-left transition-all"
+          :style="
+            activeTab === tab.id
+              ? 'color:var(--color-accent-light)'
+              : 'color:var(--color-ink-3)'
+          "
+          @click="activeTab = tab.id"
+        >
+          <div
+            v-if="activeTab === tab.id"
+            class="absolute top-1/2 left-0 -translate-y-1/2 rounded-full"
+            style="width: 2px; height: 14px; background: var(--color-accent)"
+          />
+          <div
+            v-if="activeTab === tab.id"
+            class="absolute inset-0 rounded-md"
+            style="background: var(--color-accent-dim)"
+          />
+          <component
+            :is="tab.icon"
+            :size="12"
+            class="relative shrink-0"
+          />
+          <span
+            class="relative font-medium"
+            style="font-size: 0.78rem"
+            >{{ tab.label }}</span
+          >
+        </button>
+      </div>
     </aside>
 
-    <!-- Content -->
-    <div class="flex-1 overflow-y-auto p-3 flex flex-col gap-4 themed-scroll">
-      <!-- Appearance -->
-      <div v-if="activeTab === 'appearance'">
+    <div class="themed-scroll flex flex-1 flex-col gap-3.5 overflow-y-auto p-3">
+      <div
+        v-if="activeTab === 'appearance'"
+        class="animate-fade-in flex flex-col gap-3.5"
+      >
         <Section title="Appearance">
-          <SliderSetting
-            label="Font size"
-            :value="config.fontSize"
-            :min="9"
-            :max="28"
-            :step="1"
-            :format="(v) => v + 'px'"
-            @update="config.fontSize = $event"
-          />
           <ToggleSetting
             label="Rounded corners"
             :value="config.roundedCorners"
@@ -179,17 +198,28 @@ async function onShortcutChange(
             :value="config.textShadow"
             @update="config.textShadow = $event"
           />
-          <div class="flex items-center justify-between py-2">
-            <span class="text-xs font-medium" style="color: var(--color-ink-2)">Column labels</span>
-            <div class="flex gap-1 no-drag">
+          <ToggleSetting
+            label="Integrated mode"
+            :value="config.integratedMode"
+            @update="config.integratedMode = $event"
+          />
+          <div class="flex items-center justify-between py-2.5">
+            <span
+              class="font-medium"
+              style="font-size: 0.82rem; color: var(--color-ink-2)"
+            >
+              Column labels
+            </span>
+            <div class="no-drag flex gap-1">
               <button
                 v-for="opt in ['FULL', 'SHORT', 'HIDDEN'] as const"
                 :key="opt"
-                class="px-2 py-1 rounded text-xs transition-colors"
+                class="rounded px-2.5 py-1 transition-all"
+                style="font-size: 0.72rem; font-weight: 600"
                 :style="
                   config.columnLabels === opt
-                    ? 'background: var(--color-accent-dim); color: var(--color-accent-light); border: 1px solid rgba(124,58,237,0.35);'
-                    : 'background: rgba(255,255,255,0.04); color: var(--color-ink-3); border: 1px solid var(--color-border);'
+                    ? 'background:var(--color-accent-dim);color:var(--color-accent-light);border:1px solid rgba(124,58,237,0.35)'
+                    : 'background:rgba(255,255,255,0.04);color:var(--color-ink-3);border:1px solid var(--color-border)'
                 "
                 @click="config.columnLabels = opt"
               >
@@ -197,100 +227,91 @@ async function onShortcutChange(
               </button>
             </div>
           </div>
-          <ToggleSetting
-            label="Integrated Mode"
-            :value="config.integratedMode"
-            @update="config.integratedMode = $event"
-          />
-          <p
-            v-if="config.integratedMode"
-            class="text-xs px-1 pb-1"
-            style="color: var(--color-ink-3); line-height: 1.5"
-          >
-            Footer &amp; column labels hidden, background fully transparent. Hover the header to
-            reveal controls.
-          </p>
         </Section>
       </div>
 
-      <!-- Columns -->
-      <div v-if="activeTab === 'columns'">
-        <Section
-          title="Active Columns"
-          description="Toggle columns on/off. Use ↑↓ arrows to reorder."
-        >
+      <div
+        v-if="activeTab === 'columns'"
+        class="animate-fade-in flex flex-col gap-3.5"
+      >
+        <Section title="Columns">
           <div
-            v-if="config.activeColumns && config.activeColumns.length"
-            class="flex flex-col gap-1.5 no-drag py-1"
+            v-if="config.activeColumns?.length"
+            class="flex flex-col gap-3 py-1"
           >
-            <!-- Active columns with reorder controls -->
-            <div class="mb-1">
+            <div v-if="config.activeColumns.length">
               <p
-                class="text-xs mb-1.5"
+                class="mb-1.5 tracking-widest uppercase"
                 style="
+                  font-size: 0.62rem;
                   color: var(--color-ink-3);
-                  font-size: 0.7rem;
-                  text-transform: uppercase;
-                  letter-spacing: 0.06em;
+                  letter-spacing: 0.09em;
                 "
               >
-                Active (in order)
+                Active
               </p>
               <div class="flex flex-col gap-1">
                 <div
                   v-for="(col, idx) in config.activeColumns"
                   :key="col"
-                  class="flex items-center justify-between px-2.5 py-1.5 rounded-lg"
+                  class="flex items-center justify-between rounded-md px-2.5 py-1.5"
                   style="
                     background: var(--color-accent-dim);
-                    border: 1px solid rgba(124, 58, 237, 0.3);
+                    border: 1px solid rgba(124, 58, 237, 0.25);
                   "
                 >
                   <div class="flex items-center gap-2">
-                    <div class="w-1.5 h-1.5 rounded-full" style="background: var(--color-accent)" />
-                    <span class="text-xs font-medium" style="color: var(--color-accent-light)">
+                    <div
+                      class="rounded-full"
+                      style="
+                        width: 5px;
+                        height: 5px;
+                        background: var(--color-accent);
+                        opacity: 0.8;
+                      "
+                    />
+                    <span
+                      class="font-medium"
+                      style="font-size: 0.78rem; color: var(--color-accent-light)"
+                    >
                       {{ COLUMNS[col].label }}
                     </span>
                   </div>
                   <div class="flex items-center gap-0.5">
                     <button
-                      class="btn w-5 h-5 rounded"
+                      class="btn h-5 w-5 rounded"
                       :disabled="idx === 0"
-                      style="font-size: 10px"
                       @click="moveColumn(idx, -1)"
                     >
-                      ↑
+                      <ArrowUp :size="9" />
                     </button>
                     <button
-                      class="btn w-5 h-5 rounded"
+                      class="btn h-5 w-5 rounded"
                       :disabled="idx === config.activeColumns.length - 1"
-                      style="font-size: 10px"
                       @click="moveColumn(idx, 1)"
                     >
-                      ↓
+                      <ArrowDown :size="9" />
                     </button>
                     <button
-                      class="btn w-5 h-5 rounded"
-                      style="color: var(--color-bad); font-size: 10px"
+                      class="btn h-5 w-5 rounded"
                       :disabled="config.activeColumns.length <= 1"
+                      style="color: var(--color-bad)"
                       @click="toggleColumn(col)"
                     >
-                      ✕
+                      <X :size="9" />
                     </button>
                   </div>
                 </div>
               </div>
             </div>
 
-            <!-- Inactive columns to add -->
-            <div>
+            <div v-if="inactiveColumns.length">
               <p
-                class="text-xs mb-1.5"
+                class="mb-1.5 tracking-widest uppercase"
                 style="
+                  font-size: 0.62rem;
                   color: var(--color-ink-3);
-                  font-size: 0.7rem;
-                  text-transform: uppercase;
-                  letter-spacing: 0.06em;
+                  letter-spacing: 0.09em;
                 "
               >
                 Available
@@ -299,59 +320,91 @@ async function onShortcutChange(
                 <div
                   v-for="col in inactiveColumns"
                   :key="col"
-                  class="flex items-center justify-between px-2.5 py-1.5 rounded-lg cursor-pointer transition-all"
+                  class="flex cursor-pointer items-center justify-between rounded-md px-2.5 py-1.5 transition-all"
                   style="
-                    background: rgba(255, 255, 255, 0.03);
+                    background: rgba(255, 255, 255, 0.025);
                     border: 1px solid var(--color-border);
                   "
                   @click="toggleColumn(col)"
                 >
                   <div class="flex items-center gap-2">
                     <div
-                      class="w-1.5 h-1.5 rounded-full"
-                      style="background: rgba(255, 255, 255, 0.15)"
+                      class="rounded-full"
+                      style="
+                        width: 5px;
+                        height: 5px;
+                        background: rgba(255, 255, 255, 0.12);
+                      "
                     />
-                    <span class="text-xs font-medium" style="color: var(--color-ink-3)">
+                    <span
+                      class="font-medium"
+                      style="font-size: 0.78rem; color: var(--color-ink-3)"
+                    >
                       {{ COLUMNS[col].label }}
                     </span>
                   </div>
-                  <span class="text-xs" style="color: var(--color-ink-3)">+ Add</span>
+                  <span
+                    style="
+                      font-size: 0.72rem;
+                      color: var(--color-accent-light);
+                      opacity: 0.7;
+                    "
+                  >
+                    + Add
+                  </span>
                 </div>
               </div>
             </div>
           </div>
-          <div v-else class="text-xs text-center py-4" style="color: var(--color-ink-3)">
+          <div
+            v-else
+            class="py-4 text-center"
+            style="font-size: 0.78rem; color: var(--color-ink-3)"
+          >
             No columns configured. Reset settings to fix.
           </div>
         </Section>
       </div>
 
-      <!-- Sorting -->
-      <div v-if="activeTab === 'sorting'">
+      <div
+        v-if="activeTab === 'sorting'"
+        class="animate-fade-in flex flex-col gap-3.5"
+      >
         <Section title="Sort By">
-          <div v-if="SORTABLE_COLUMNS.length" class="flex flex-col gap-1.5 no-drag py-1">
+          <div
+            v-if="SORTABLE_COLUMNS.length"
+            class="no-drag flex flex-col gap-1 py-1"
+          >
             <div
               v-for="col in SORTABLE_COLUMNS"
               :key="col"
-              class="flex items-center gap-2 px-2.5 py-2 rounded-lg cursor-pointer text-xs transition-all"
+              class="flex cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-2 transition-all"
+              style="font-size: 0.82rem"
               :style="
                 config.sortBy === col
-                  ? 'background: var(--color-accent-dim); border: 1px solid rgba(124,58,237,0.3); color: var(--color-accent-light);'
-                  : 'background: rgba(255,255,255,0.03); border: 1px solid var(--color-border); color: var(--color-ink-3);'
+                  ? 'background:var(--color-accent-dim);border:1px solid rgba(124,58,237,0.28);color:var(--color-accent-light)'
+                  : 'background:rgba(255,255,255,0.025);border:1px solid var(--color-border);color:var(--color-ink-3)'
               "
               @click="config.sortBy = col"
             >
               <div
-                class="w-1.5 h-1.5 rounded-full"
+                class="rounded-full"
+                style="width: 5px; height: 5px; flex-shrink: 0"
                 :style="{
                   background:
-                    config.sortBy === col ? 'var(--color-accent)' : 'rgba(255,255,255,0.15)',
+                    config.sortBy === col
+                      ? 'var(--color-accent)'
+                      : 'rgba(255,255,255,0.14)',
                 }"
               />
               {{ COLUMNS[col].label }}
             </div>
           </div>
-          <div v-else class="text-xs text-center py-4" style="color: var(--color-ink-3)">
+          <div
+            v-else
+            class="py-4 text-center"
+            style="font-size: 0.78rem; color: var(--color-ink-3)"
+          >
             No sortable columns available.
           </div>
           <ToggleSetting
@@ -362,11 +415,13 @@ async function onShortcutChange(
         </Section>
       </div>
 
-      <!-- Shortcuts -->
-      <div v-if="activeTab === 'shortcuts'">
+      <div
+        v-if="activeTab === 'shortcuts'"
+        class="animate-fade-in flex flex-col gap-3.5"
+      >
         <Section
           title="Keyboard Shortcuts"
-          description="Click a field then press your desired key combo."
+          description="Click a field then press your desired key combination."
         >
           <ShortcutInput
             label="Minimize / Restore"
@@ -381,8 +436,45 @@ async function onShortcutChange(
         </Section>
       </div>
 
-      <!-- Advanced -->
-      <div v-if="activeTab === 'advanced'">
+      <div
+        v-if="activeTab === 'advanced'"
+        class="animate-fade-in flex flex-col gap-3.5"
+      >
+        <Section title="Network">
+          <div class="flex flex-col gap-2 py-2">
+            <p style="font-size: 0.76rem; color: var(--color-ink-3); line-height: 1.5">
+              Determines which API is used to fetch player stats. Changing the network
+              clears the player list.
+            </p>
+            <div class="no-drag flex gap-2">
+              <button
+                v-for="net in NETWORKS"
+                :key="net.value"
+                class="flex-1 rounded-md py-2 font-semibold transition-all"
+                style="font-size: 0.78rem"
+                :style="{
+                  background:
+                    config.network === net.value
+                      ? `${NETWORK_COLORS[net.value]}14`
+                      : 'rgba(255,255,255,0.025)',
+                  border: `1px solid ${config.network === net.value ? NETWORK_COLORS[net.value] + '50' : 'var(--color-border)'}`,
+                  color:
+                    config.network === net.value
+                      ? NETWORK_COLORS[net.value]
+                      : 'var(--color-ink-3)',
+                  boxShadow:
+                    config.network === net.value
+                      ? `0 0 12px ${NETWORK_COLORS[net.value]}15`
+                      : 'none',
+                }"
+                @click="onNetworkChange(net.value)"
+              >
+                {{ net.label }}
+              </button>
+            </div>
+          </div>
+        </Section>
+
         <Section title="Auto-detection">
           <ToggleSetting
             label="Auto-add on join"
@@ -411,49 +503,67 @@ async function onShortcutChange(
           />
         </Section>
 
-        <Section title="Updates" class="mt-1">
+        <Section title="Updates">
           <ToggleSetting
             label="Auto-update on launch"
             :value="config.autoUpdateEnabled"
             @update="config.autoUpdateEnabled = $event"
           />
-          <p class="text-[11px] px-1" style="color: var(--color-ink-3); line-height: 1.5">
-            Automatically checks for updates on launch. Downloads and installs on next
-            exit.
-          </p>
-          <div class="flex items-center justify-between py-2">
-            <span class="text-xs" style="color: var(--color-ink-2)">
-              {{ updateStatusText }}
-            </span>
+          <div class="flex items-center justify-between py-2.5">
+            <span style="font-size: 0.8rem; color: var(--color-ink-2)">{{
+              updateStatusText
+            }}</span>
             <button
-              class="btn px-3 py-1.5 rounded-lg text-xs no-drag"
-              style="border: 1px solid var(--color-border); color: var(--color-ink-2)"
+              class="btn no-drag flex items-center gap-1.5 rounded-md"
+              style="
+                font-size: 0.75rem;
+                padding: 0.3rem 0.75rem;
+                border: 1px solid var(--color-border);
+                color: var(--color-ink-2);
+              "
               :disabled="updateStatus === 'checking' || updateStatus === 'downloading'"
               @click="checkUpdate"
             >
-              Check now
+              <RefreshCw :size="10" />
+              Check
             </button>
           </div>
-          <div v-if="updateStatus === 'downloaded'" class="flex items-center justify-between py-2">
-            <span class="text-xs" style="color: var(--color-good)">Ready to install</span>
+          <div
+            v-if="updateStatus === 'downloaded'"
+            class="flex items-center justify-between py-2.5"
+          >
+            <span style="font-size: 0.8rem; color: var(--color-good)"
+              >Ready to install</span
+            >
             <button
-              class="btn px-3 py-1.5 rounded-lg text-xs no-drag"
-              style="border: 1px solid rgba(52, 211, 153, 0.3); color: var(--color-good)"
+              class="btn no-drag flex items-center gap-1.5 rounded-md"
+              style="
+                font-size: 0.75rem;
+                padding: 0.3rem 0.75rem;
+                border: 1px solid rgba(52, 211, 153, 0.3);
+                color: var(--color-good);
+              "
               @click="installUpdate"
             >
-              Restart and install
+              <Download :size="10" />
+              Restart & install
             </button>
           </div>
         </Section>
 
-        <Section title="Danger Zone" class="mt-1">
-          <div class="flex items-center justify-between py-2">
-            <span class="text-xs" style="color: var(--color-ink-2)">
+        <Section title="Danger Zone">
+          <div class="flex items-center justify-between py-2.5">
+            <span style="font-size: 0.82rem; color: var(--color-ink-2)">
               Reset all settings to defaults
             </span>
             <button
-              class="btn px-3 py-1.5 rounded-lg text-xs no-drag"
-              style="border: 1px solid rgba(248, 113, 113, 0.3); color: var(--color-bad)"
+              class="btn no-drag rounded-md"
+              style="
+                font-size: 0.75rem;
+                padding: 0.3rem 0.75rem;
+                border: 1px solid rgba(248, 113, 113, 0.25);
+                color: var(--color-bad);
+              "
               @click="config.$reset()"
             >
               Reset

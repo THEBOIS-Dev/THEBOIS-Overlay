@@ -21,8 +21,16 @@
 
 ## Showcase
 
+### PikaNetwork
+
 <p align="center">
-  <img src="assets/showcase.png" alt="Showcase" />
+  <img src="assets/showcase-pika.png" alt="PikaNetwork Showcase" />
+</p>
+
+### JartexNetwork
+
+<p align="center">
+  <img src="assets/showcase-jartex.png" alt="JartexNetwork Showcase" />
 </p>
 
 ---
@@ -80,7 +88,7 @@ bun run typecheck      # vue-tsc --noEmit
 
 **IPC surface** — the renderer never imports Node APIs directly. Everything goes through the context bridge (`window.api`). The bridge is typed in `types/index.ts` via a global `Window` augmentation.
 
-**API client** — `main/index.ts` runs all PikaNetwork requests through a three-layer stack: a TTL cache (60 s) → request deduplication (in-flight map) → a semaphore (16 concurrent max) → Axios with retry (3×, linear back-off).
+**API client** — `main/index.ts` runs all PikaNetwork and JartexNetwork requests through a three-layer stack: a TTL cache (60 s) → request deduplication (in-flight map) → a semaphore (16 concurrent max) → Axios with retry (3×, linear back-off).
 
 **State persistence** — `config` and `nicks` stores are persisted to `localStorage` via `pinia-plugin-persistedstate`. `players` is intentionally not persisted; it is cleared on every launch.
 

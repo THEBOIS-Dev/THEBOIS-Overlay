@@ -1,38 +1,25 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
-import { useConfigStore } from '@renderer/store/config'
+import { useConfigStore } from '@renderer/store/config';
+import { Blend, Image, RotateCcw, Square } from 'lucide-vue-next';
+import { SliderRange, SliderRoot, SliderThumb, SliderTrack } from 'radix-vue';
+import { computed, defineComponent, h, ref } from 'vue';
 
-const config = useConfigStore()
-const theme = computed(() => config.theme)
+const config = useConfigStore();
+const theme = computed(() => config.theme);
+const activeTab = ref<'background' | 'colors'>('background');
 
 const TABS = [
-  {
-    id: 'background',
-    label: 'Background',
-    icon: 'M12 3c-4.97 0-9 4.03-9 9s4.03 9 9 9c.83 0 1.5-.67 1.5-1.5 0-.39-.15-.74-.39-1.01-.23-.26-.38-.61-.38-.99 0-.83.67-1.5 1.5-1.5H16c2.76 0 5-2.24 5-5 0-4.42-4.03-8-9-8zm-5.5 9c-.83 0-1.5-.67-1.5-1.5S5.67 9 6.5 9 8 9.67 8 10.5 7.33 12 6.5 12zm3-4C8.67 8 8 7.33 8 6.5S8.67 5 9.5 5s1.5.67 1.5 1.5S10.33 8 9.5 8zm5 0c-.83 0-1.5-.67-1.5-1.5S13.67 5 14.5 5s1.5.67 1.5 1.5S15.33 8 14.5 8zm3 4c-.83 0-1.5-.67-1.5-1.5S16.67 9 17.5 9s1.5.67 1.5 1.5-.67 1.5-1.5 1.5z',
-  },
-  {
-    id: 'colors',
-    label: 'Colors',
-    icon: 'M12 22C6.49 22 2 17.51 2 12S6.49 2 12 2s10 4.04 10 9c0 3.31-2.69 6-6 6h-1.77c-.28 0-.5.22-.5.5 0 .12.05.23.13.33.41.47.64 1.06.64 1.67A2.5 2.5 0 0 1 12 22zm0-18c-4.41 0-8 3.59-8 8s3.59 8 8 8c.28 0 .5-.22.5-.5a.54.54 0 0 0-.14-.35c-.41-.46-.63-1.05-.63-1.65a2.5 2.5 0 0 1 2.5-2.5H16c2.21 0 4-1.79 4-4 0-3.86-3.59-7-8-7z M7.5 13a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm2-4a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm5 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm2 4a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3z',
-  },
-]
+  { id: 'background', label: 'Background', icon: Blend },
+  { id: 'colors', label: 'Colors', icon: Palette },
+];
 
-const activeTab = ref<'background' | 'colors'>('background')
+import { Palette } from 'lucide-vue-next';
 
 const BG_TYPES = [
-  { id: 'solid', label: 'Solid', icon: 'M3 3h18v18H3z' },
-  {
-    id: 'gradient',
-    label: 'Gradient',
-    icon: 'M11 9h2v2h-2zm-2 2h2v2H9zm4 0h2v2h-2zm2-2h2v2h-2zM7 9h2v2H7zm12-6H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V5h14v14zM9 13h2v2H9zm-2 0h2v2H7zm4 0h2v2h-2zm2 0h2v2h-2zm2 0h2v2h-2z',
-  },
-  {
-    id: 'image',
-    label: 'Image',
-    icon: 'M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z',
-  },
-]
+  { id: 'solid', label: 'Solid', icon: Square },
+  { id: 'gradient', label: 'Gradient', icon: Blend },
+  { id: 'image', label: 'Image', icon: Image },
+];
 
 const DIRECTIONS = [
   { label: '→', value: 'to right' },
@@ -43,7 +30,7 @@ const DIRECTIONS = [
   { label: '↙', value: 'to bottom left' },
   { label: '↗', value: 'to top right' },
   { label: '↖', value: 'to top left' },
-]
+];
 
 const UI_COLORS = [
   { key: 'accent', label: 'Accent' },
@@ -55,7 +42,7 @@ const UI_COLORS = [
   { key: 'nick', label: 'Nick Color' },
   { key: 'good', label: 'Good Stat' },
   { key: 'bad', label: 'Bad Stat' },
-]
+];
 
 const RANK_COLORS = [
   { key: 'rankOwner', label: 'Owner' },
@@ -71,19 +58,19 @@ const RANK_COLORS = [
   { key: 'rankTitan', label: 'Titan' },
   { key: 'rankElite', label: 'Elite' },
   { key: 'rankVip', label: 'VIP' },
-]
+];
 
 const solidHex = computed(() => {
-  const h = theme.value.bgColor.replace('#', '').slice(0, 6).padEnd(6, '0')
-  return '#' + h
-})
+  const h = theme.value.bgColor.replace('#', '').slice(0, 6).padEnd(6, '0');
+  return '#' + h;
+});
 
 function onSolidColor(e: Event): void {
-  theme.value.bgColor = (e.target as HTMLInputElement).value
+  theme.value.bgColor = (e.target as HTMLInputElement).value;
 }
 function onSolidHexInput(val: string): void {
-  const v = val.startsWith('#') ? val : '#' + val
-  if (/^#[0-9a-fA-F]{6}$/.test(v)) theme.value.bgColor = v
+  const v = val.startsWith('#') ? val : '#' + val;
+  if (/^#[0-9a-fA-F]{6}$/.test(v)) theme.value.bgColor = v;
 }
 
 const gradientPreview = computed(() => {
@@ -91,50 +78,46 @@ const gradientPreview = computed(() => {
     .slice()
     .sort((a, b) => a.position - b.position)
     .map((s) => `${s.color} ${s.position}%`)
-    .join(', ')
-  return `linear-gradient(${theme.value.bgGradientDir}, ${stops})`
-})
+    .join(', ');
+  return `linear-gradient(${theme.value.bgGradientDir}, ${stops})`;
+});
 
 function addStop(): void {
-  const stops = theme.value.bgGradientStops
-  const last = stops[stops.length - 1]?.position ?? 50
-  stops.push({ color: '#ffffff', position: Math.min(100, Math.round((last + 100) / 2)) })
+  const stops = theme.value.bgGradientStops;
+  const last = stops[stops.length - 1]?.position ?? 50;
+  stops.push({ color: '#ffffff', position: Math.min(100, Math.round((last + 100) / 2)) });
 }
 function removeStop(i: number): void {
-  theme.value.bgGradientStops.splice(i, 1)
+  theme.value.bgGradientStops.splice(i, 1);
 }
 
 const previewBg = computed(() => {
-  const t = theme.value
-  if (t.bgType === 'gradient') return gradientPreview.value
-  if (t.bgType === 'image') return 'rgb(6,9,20)'
-  return solidHex.value
-})
+  const t = theme.value;
+  if (t.bgType === 'gradient') return gradientPreview.value;
+  if (t.bgType === 'image') return 'rgb(6,9,20)';
+  return solidHex.value;
+});
 
 const imageFilename = computed(() => {
-  const url = theme.value.bgImageUrl
-  if (!url) return ''
-  if (url.startsWith('data:')) return 'custom image (embedded)'
-  const parts = url.replace(/\\/g, '/').split('/')
-  return parts[parts.length - 1] || url
-})
+  const url = theme.value.bgImageUrl;
+  if (!url) return '';
+  if (url.startsWith('data:')) return 'custom image (embedded)';
+  const parts = url.replace(/\\/g, '/').split('/');
+  return parts[parts.length - 1] || url;
+});
 
 async function pickLocalImage(): Promise<void> {
-  const result = await window.api.app.openImageDialog()
+  const result = await window.api.app.openImageDialog();
   if (!result.canceled && result.filePaths.length > 0) {
-    theme.value.bgImageUrl = await window.api.app.readFileBase64(result.filePaths[0])
+    theme.value.bgImageUrl = await window.api.app.readFileBase64(result.filePaths[0]);
   }
 }
 
 function resetTheme(): void {
-  config.resetTheme()
+  config.resetTheme();
 }
-</script>
 
-<script lang="ts">
-import { defineComponent, h } from 'vue'
-
-export const ColorRow = defineComponent({
+const ColorRow = defineComponent({
   name: 'ColorRow',
   props: {
     label: { type: String, required: true },
@@ -143,134 +126,154 @@ export const ColorRow = defineComponent({
   emits: ['update'],
   setup(props, { emit }) {
     const displayColor = () => {
-      const v = props.value
-      if (!v || v.startsWith('rgba')) return '#888888'
-      return v
-    }
-
+      const v = props.value;
+      if (!v || v.startsWith('rgba')) return '#888888';
+      return v;
+    };
     return () =>
       h('div', { class: 'flex items-center gap-3 px-3 py-2 no-drag' }, [
-        h('label', { style: 'position: relative; cursor: pointer; flex-shrink: 0;' }, [
+        h('label', { style: 'position:relative;cursor:pointer;flex-shrink:0' }, [
           h('div', {
-            style: `
-              width: 20px; height: 20px;
-              border-radius: 50%;
-              background: ${displayColor()};
-              border: 1.5px solid rgba(255,255,255,0.18);
-              box-shadow: 0 0 6px ${displayColor()}44;
-            `,
+            style: `width:20px;height:20px;border-radius:50%;background:${displayColor()};border:1.5px solid rgba(255,255,255,0.18);box-shadow:0 0 6px ${displayColor()}44`,
           }),
           h('input', {
             type: 'color',
             value: displayColor(),
-            style: 'position: absolute; opacity: 0; width: 0; height: 0; pointer-events: none;',
+            style: 'position:absolute;opacity:0;width:0;height:0;pointer-events:none',
             onInput: (e: Event) => emit('update', (e.target as HTMLInputElement).value),
           }),
         ]),
         h(
           'span',
-          {
-            class: 'text-xs flex-1',
-            style: 'color: var(--color-ink-2);',
-          },
+          { class: 'text-xs flex-1', style: 'color:var(--color-ink-2)' },
           props.label,
         ),
         h('input', {
           value: props.value,
           class: 'input-field font-mono no-drag',
-          style: 'height: 22px; width: 80px; font-size: 0.7rem; padding: 0 6px; text-align: right;',
+          style: 'height:22px;width:80px;font-size:0.7rem;padding:0 6px;text-align:right',
           onChange: (e: Event) => emit('update', (e.target as HTMLInputElement).value),
         }),
-      ])
+      ]);
   },
-})
+});
+
+function opacitySliderModel(prop: 'opacity' | 'bgImageOpacity') {
+  return computed({
+    get: () => [theme.value[prop] * 100],
+    set: (v: number[]) => {
+      theme.value[prop] = v[0] / 100;
+    },
+  });
+}
+
+const opacityModel = opacitySliderModel('opacity');
+const bgImageOpacityModel = opacitySliderModel('bgImageOpacity');
 </script>
 
-<!-- ── Inline ColorRow component ─────────────────────────────────────────────── -->
 <template>
-  <div class="flex h-full overflow-hidden" style="pointer-events: all">
-    <!-- ── Sidebar ── -->
+  <div
+    class="flex h-full overflow-hidden"
+    style="pointer-events: all"
+  >
     <aside
-      class="shrink-0 flex flex-col gap-0.5 p-2 border-r overflow-y-auto themed-scroll"
-      style="width: 132px; border-color: var(--color-border)"
+      class="themed-scroll flex shrink-0 flex-col overflow-y-auto border-r py-2"
+      style="
+        width: 128px;
+        border-color: var(--color-border);
+        background: rgba(255, 255, 255, 0.012);
+      "
     >
-      <button
-        v-for="tab in TABS"
-        :key="tab.id"
-        class="flex items-center gap-2 px-2.5 py-2 rounded-lg text-xs text-left transition-colors no-drag"
-        :style="
-          activeTab === tab.id
-            ? 'background: var(--color-accent-dim); color: var(--color-accent-light);'
-            : 'color: var(--color-ink-2);'
-        "
-        @click="activeTab = tab.id"
-      >
-        <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" class="shrink-0">
-          <path :d="tab.icon" />
-        </svg>
-        {{ tab.label }}
-      </button>
-
-      <div class="flex-1" />
-
-      <button
-        class="flex items-center gap-1.5 px-2.5 py-2 rounded-lg text-xs transition-colors no-drag"
-        style="color: #f87171"
-        @click="resetTheme"
-      >
-        <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor">
-          <path
-            d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"
+      <div class="flex flex-1 flex-col gap-0.5 px-2">
+        <button
+          v-for="tab in TABS"
+          :key="tab.id"
+          class="no-drag relative flex items-center gap-2.5 rounded-md px-2.5 py-2.5 text-left transition-all"
+          :style="
+            activeTab === tab.id
+              ? 'color:var(--color-accent-light)'
+              : 'color:var(--color-ink-3)'
+          "
+          @click="activeTab = tab.id as any"
+        >
+          <div
+            v-if="activeTab === tab.id"
+            class="absolute top-1/2 left-0 -translate-y-1/2 rounded-full"
+            style="width: 2px; height: 14px; background: var(--color-accent)"
           />
-        </svg>
-        Reset
-      </button>
+          <div
+            v-if="activeTab === tab.id"
+            class="absolute inset-0 rounded-md"
+            style="background: var(--color-accent-dim)"
+          />
+          <component
+            :is="tab.icon"
+            :size="12"
+            class="relative shrink-0"
+          />
+          <span
+            class="relative font-medium"
+            style="font-size: 0.78rem"
+            >{{ tab.label }}</span
+          >
+        </button>
+      </div>
+      <div class="mt-auto px-2 pt-1">
+        <button
+          class="no-drag relative flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 transition-all"
+          style="color: rgba(248, 113, 113, 0.7); font-size: 0.78rem; font-weight: 500"
+          @click="resetTheme"
+        >
+          <RotateCcw :size="11" />
+          Reset
+        </button>
+      </div>
     </aside>
 
-    <!-- ── Content ── -->
-    <div class="flex-1 overflow-y-auto p-3 flex flex-col gap-3 themed-scroll">
-      <!-- ────────────── BACKGROUND TAB ────────────── -->
+    <div class="themed-scroll flex flex-1 flex-col gap-3 overflow-y-auto p-3">
       <template v-if="activeTab === 'background'">
-        <!-- BG Type selector -->
         <div class="flex gap-1.5">
           <button
             v-for="t in BG_TYPES"
             :key="t.id"
-            class="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-semibold transition-all no-drag"
+            class="no-drag flex flex-1 items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-semibold transition-all"
             :style="
               theme.bgType === t.id
-                ? 'background: rgba(124,58,237,0.2); color: #b89aff; border: 1px solid rgba(124,58,237,0.45); box-shadow: 0 0 10px rgba(124,58,237,0.18);'
-                : 'background: var(--color-surface-1); color: var(--color-ink-3); border: 1px solid var(--color-border);'
+                ? 'background:rgba(124,58,237,0.2);color:#b89aff;border:1px solid rgba(124,58,237,0.45);box-shadow:0 0 10px rgba(124,58,237,0.18)'
+                : 'background:var(--color-surface-1);color:var(--color-ink-3);border:1px solid var(--color-border)'
             "
             @click="theme.bgType = t.id as any"
           >
-            <svg viewBox="0 0 24 24" width="11" height="11" fill="currentColor">
-              <path :d="t.icon" />
-            </svg>
+            <component
+              :is="t.icon"
+              :size="11"
+            />
             {{ t.label }}
           </button>
         </div>
 
-        <!-- ── SOLID ── -->
         <template v-if="theme.bgType === 'solid'">
           <div class="card divide-subtle">
-            <!-- Color row -->
-            <div class="flex items-center gap-3 px-3 py-2.5 no-drag">
-              <label class="cursor-pointer relative shrink-0">
+            <div class="no-drag flex items-center gap-3 px-3 py-2.5">
+              <label class="relative shrink-0 cursor-pointer">
                 <div
                   class="rounded-md border"
-                  style="width: 32px; height: 32px; border-color: rgba(255, 255, 255, 0.12)"
+                  style="
+                    width: 32px;
+                    height: 32px;
+                    border-color: rgba(255, 255, 255, 0.12);
+                  "
                   :style="{ background: solidHex }"
                 />
                 <input
                   type="color"
                   :value="solidHex"
-                  class="absolute opacity-0 w-0 h-0 pointer-events-none"
+                  class="pointer-events-none absolute h-0 w-0 opacity-0"
                   @input="onSolidColor($event)"
                 />
               </label>
-              <div class="flex flex-col flex-1 gap-1">
-                <span class="text-xs font-medium" style="color: var(--color-ink-2)">Color</span>
+              <div class="flex flex-1 flex-col gap-1">
+                <span class="text-ink-2 text-xs font-medium">Color</span>
                 <input
                   :value="solidHex"
                   class="input-field font-mono text-xs"
@@ -279,58 +282,54 @@ export const ColorRow = defineComponent({
                 />
               </div>
             </div>
-
-            <!-- Opacity row -->
-            <div class="px-3 py-2.5 no-drag">
-              <div class="flex justify-between mb-1.5">
-                <span class="text-xs font-medium" style="color: var(--color-ink-2)">Opacity</span>
-                <span
-                  class="text-xs font-mono tabular-nums"
-                  style="color: var(--color-accent-light)"
-                >
+            <div class="no-drag px-3 py-2.5">
+              <div class="mb-2 flex justify-between">
+                <span class="text-ink-2 text-xs font-medium">Opacity</span>
+                <span class="text-accent-light font-mono text-xs tabular-nums">
                   {{ Math.round(theme.opacity * 100) }}%
                 </span>
               </div>
-              <input
-                type="range"
-                min="0"
-                max="1"
-                step="0.01"
-                :value="theme.opacity"
-                class="themed-range w-full"
-                @input="theme.opacity = parseFloat(($event.target as HTMLInputElement).value)"
-                @change="theme.opacity = parseFloat(($event.target as HTMLInputElement).value)"
-              />
+              <SliderRoot
+                v-model="opacityModel"
+                :min="0"
+                :max="100"
+                :step="1"
+                class="relative flex h-4 w-full touch-none items-center select-none"
+              >
+                <SliderTrack class="bg-border relative h-[3px] grow rounded-full">
+                  <SliderRange class="bg-accent absolute h-full rounded-full" />
+                </SliderTrack>
+                <SliderThumb
+                  class="bg-accent-light block h-3 w-3 cursor-pointer rounded-full border-2 border-[rgba(124,58,237,0.6)] focus:outline-none"
+                  style="box-shadow: 0 0 6px rgba(124, 58, 237, 0.4)"
+                />
+              </SliderRoot>
             </div>
           </div>
         </template>
 
-        <!-- ── GRADIENT ── -->
         <template v-if="theme.bgType === 'gradient'">
-          <!-- Live gradient bar -->
           <div
             class="h-8 rounded-lg"
             style="border: 1px solid rgba(255, 255, 255, 0.07)"
             :style="{ background: gradientPreview }"
           />
 
-          <!-- Direction -->
           <div class="card px-3 py-2.5">
             <span
-              class="text-xs font-semibold uppercase tracking-widest mb-2 block"
-              style="color: var(--color-ink-3)"
+              class="text-ink-3 mb-2 block text-xs font-semibold tracking-widest uppercase"
             >
               Direction
             </span>
-            <div class="flex flex-wrap gap-1 no-drag">
+            <div class="no-drag flex flex-wrap gap-1">
               <button
                 v-for="d in DIRECTIONS"
                 :key="d.value"
-                class="w-8 h-7 rounded text-sm transition-all"
+                class="h-7 w-8 rounded text-sm transition-all"
                 :style="
                   theme.bgGradientDir === d.value
-                    ? 'background: rgba(124,58,237,0.25); color: #b89aff; border: 1px solid rgba(124,58,237,0.5);'
-                    : 'background: var(--color-surface-1); color: var(--color-ink-3); border: 1px solid var(--color-border);'
+                    ? 'background:rgba(124,58,237,0.25);color:#b89aff;border:1px solid rgba(124,58,237,0.5)'
+                    : 'background:var(--color-surface-1);color:var(--color-ink-3);border:1px solid var(--color-border)'
                 "
                 @click="theme.bgGradientDir = d.value"
               >
@@ -339,57 +338,62 @@ export const ColorRow = defineComponent({
             </div>
           </div>
 
-          <!-- Color stops -->
           <div class="card divide-subtle">
             <div
               v-for="(stop, i) in theme.bgGradientStops"
               :key="i"
-              class="flex items-center gap-2.5 px-3 py-2 no-drag"
+              class="no-drag flex items-center gap-2.5 px-3 py-2"
             >
-              <label class="cursor-pointer relative shrink-0">
+              <label class="relative shrink-0 cursor-pointer">
                 <div
                   class="rounded border"
-                  style="width: 22px; height: 22px; border-color: rgba(255, 255, 255, 0.12)"
+                  style="
+                    width: 22px;
+                    height: 22px;
+                    border-color: rgba(255, 255, 255, 0.12);
+                  "
                   :style="{ background: stop.color }"
                 />
                 <input
                   type="color"
                   :value="stop.color"
-                  class="absolute opacity-0 w-0 h-0 pointer-events-none"
+                  class="pointer-events-none absolute h-0 w-0 opacity-0"
                   @input="stop.color = ($event.target as HTMLInputElement).value"
                 />
               </label>
-              <input
-                type="range"
-                min="0"
-                max="100"
-                step="1"
-                :value="stop.position"
-                class="themed-range flex-1"
-                @input="stop.position = parseInt(($event.target as HTMLInputElement).value)"
-              />
+              <SliderRoot
+                :model-value="[stop.position]"
+                :min="0"
+                :max="100"
+                :step="1"
+                class="relative flex h-4 flex-1 touch-none items-center select-none"
+                @update:model-value="(value) => (stop.position = value?.[0] ?? 0)"
+              >
+                <SliderTrack class="bg-border relative h-[3px] grow rounded-full">
+                  <SliderRange class="bg-accent absolute h-full rounded-full" />
+                </SliderTrack>
+                <SliderThumb
+                  class="bg-accent-light block h-3 w-3 cursor-pointer rounded-full border-2 border-[rgba(124,58,237,0.6)] focus:outline-none"
+                />
+              </SliderRoot>
               <span
-                class="text-xs font-mono tabular-nums"
-                style="color: var(--color-ink-3); min-width: 30px; text-align: right"
+                class="text-ink-3 min-w-[30px] text-right font-mono text-xs tabular-nums"
               >
                 {{ stop.position }}%
               </span>
               <button
                 v-if="theme.bgGradientStops.length > 2"
-                class="w-5 h-5 flex items-center justify-center rounded text-xs transition-colors"
-                style="color: #f87171; background: rgba(248, 113, 113, 0.1)"
+                class="flex h-5 w-5 items-center justify-center rounded bg-[rgba(248,113,113,0.1)] text-xs text-red-400 transition-colors"
                 @click="removeStop(i)"
               >
                 ✕
               </button>
             </div>
-
-            <div class="px-3 py-2 no-drag">
+            <div class="no-drag px-3 py-2">
               <button
-                class="text-xs px-3 py-1 rounded-md transition-colors"
+                class="text-accent-light rounded-md px-3 py-1 text-xs transition-colors"
                 style="
                   background: rgba(124, 58, 237, 0.1);
-                  color: #b89aff;
                   border: 1px solid rgba(124, 58, 237, 0.22);
                 "
                 @click="addStop"
@@ -399,79 +403,66 @@ export const ColorRow = defineComponent({
             </div>
           </div>
 
-          <!-- Opacity -->
-          <div class="card px-3 py-2.5 no-drag">
-            <div class="flex justify-between mb-1.5">
-              <span class="text-xs font-medium" style="color: var(--color-ink-2)">Opacity</span>
-              <span class="text-xs font-mono tabular-nums" style="color: var(--color-accent-light)">
+          <div class="card no-drag px-3 py-2.5">
+            <div class="mb-2 flex justify-between">
+              <span class="text-ink-2 text-xs font-medium">Opacity</span>
+              <span class="text-accent-light font-mono text-xs tabular-nums">
                 {{ Math.round(theme.opacity * 100) }}%
               </span>
             </div>
-            <input
-              type="range"
-              min="0"
-              max="1"
-              step="0.01"
-              :value="theme.opacity"
-              class="themed-range w-full"
-              @input="theme.opacity = parseFloat(($event.target as HTMLInputElement).value)"
-              @change="theme.opacity = parseFloat(($event.target as HTMLInputElement).value)"
-            />
+            <SliderRoot
+              v-model="opacityModel"
+              :min="0"
+              :max="100"
+              :step="1"
+              class="relative flex h-4 w-full touch-none items-center select-none"
+            >
+              <SliderTrack class="bg-border relative h-[3px] grow rounded-full">
+                <SliderRange class="bg-accent absolute h-full rounded-full" />
+              </SliderTrack>
+              <SliderThumb
+                class="bg-accent-light block h-3 w-3 cursor-pointer rounded-full border-2 border-[rgba(124,58,237,0.6)] focus:outline-none"
+                style="box-shadow: 0 0 6px rgba(124, 58, 237, 0.4)"
+              />
+            </SliderRoot>
           </div>
         </template>
 
-        <!-- ── IMAGE ── -->
         <template v-if="theme.bgType === 'image'">
           <div class="card divide-subtle">
-            <div class="px-3 py-2.5 no-drag">
-              <span class="text-xs font-medium block mb-2" style="color: var(--color-ink-2)">
+            <div class="no-drag px-3 py-2.5">
+              <span class="text-ink-2 mb-2 block text-xs font-medium">
                 Background Image
               </span>
               <div class="flex flex-col gap-2">
                 <button
-                  class="flex items-center justify-center gap-2 rounded-lg text-xs py-2 px-3 transition-all"
+                  class="text-accent-light flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-xs transition-all"
                   style="
                     background: rgba(124, 58, 237, 0.12);
-                    color: #b89aff;
                     border: 1px solid rgba(124, 58, 237, 0.28);
                   "
                   @click="pickLocalImage"
                 >
-                  <svg viewBox="0 0 24 24" width="12" height="12" fill="currentColor">
-                    <path
-                      d="M20 6h-2.18c.07-.44.18-.88.18-1.36C18 2.54 15.96.5 13.5.5c-1.5 0-2.81.75-3.6 1.87l-.9 1.13-.9-1.14C7.31 1.25 6 .5 4.5.5 2.04.5 0 2.54 0 4.64c0 .48.11.92.18 1.36H0v11c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zM13.5 2c1.21 0 2.5.64 2.5 2.64 0 1.36-.79 2.36-2.5 2.36H10V4.5C10 3.12 11.12 2 13.5 2zM2 4.64C2 3.57 2.96 2.5 4.5 2.5 6.88 2.5 8 3.62 8 5v2H4.5C2.79 7 2 6 2 4.64zM2 17V8h7v9H2zm9 0V8h7l.001 9H11z"
-                    />
-                  </svg>
+                  <Image :size="12" />
                   Choose local image…
                 </button>
                 <div
                   v-if="theme.bgImageUrl"
-                  class="flex items-center gap-2 px-2 py-1.5 rounded"
+                  class="flex items-center gap-2 rounded px-2 py-1.5"
                   style="
                     background: rgba(255, 255, 255, 0.04);
                     border: 1px solid var(--color-border);
                   "
                 >
-                  <svg
-                    viewBox="0 0 24 24"
-                    width="10"
-                    height="10"
-                    fill="currentColor"
-                    style="color: var(--color-good); flex-shrink: 0"
-                  >
-                    <path
-                      d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"
-                    />
-                  </svg>
-                  <span
-                    class="text-xs truncate flex-1"
-                    style="color: var(--color-ink-3); font-family: var(--font-mono)"
-                  >
+                  <Image
+                    :size="10"
+                    class="text-good shrink-0"
+                  />
+                  <span class="text-ink-3 flex-1 truncate font-mono text-xs">
                     {{ imageFilename }}
                   </span>
                   <button
-                    class="text-xs shrink-0"
-                    style="color: var(--color-bad)"
+                    class="text-bad shrink-0 text-xs"
                     @click="theme.bgImageUrl = ''"
                   >
                     ✕
@@ -480,76 +471,65 @@ export const ColorRow = defineComponent({
               </div>
             </div>
 
-            <div class="px-3 py-2.5 no-drag">
-              <div class="flex justify-between mb-1.5">
-                <span class="text-xs font-medium" style="color: var(--color-ink-2)">
-                  Image opacity
-                </span>
-                <span
-                  class="text-xs font-mono tabular-nums"
-                  style="color: var(--color-accent-light)"
-                >
+            <div class="no-drag px-3 py-2.5">
+              <div class="mb-2 flex justify-between">
+                <span class="text-ink-2 text-xs font-medium">Image opacity</span>
+                <span class="text-accent-light font-mono text-xs tabular-nums">
                   {{ Math.round(theme.bgImageOpacity * 100) }}%
                 </span>
               </div>
-              <input
-                type="range"
-                min="0"
-                max="1"
-                step="0.01"
-                :value="theme.bgImageOpacity"
-                class="themed-range w-full"
-                @input="
-                  theme.bgImageOpacity = parseFloat(($event.target as HTMLInputElement).value)
-                "
-                @change="
-                  theme.bgImageOpacity = parseFloat(($event.target as HTMLInputElement).value)
-                "
-              />
+              <SliderRoot
+                v-model="bgImageOpacityModel"
+                :min="0"
+                :max="100"
+                :step="1"
+                class="relative flex h-4 w-full touch-none items-center select-none"
+              >
+                <SliderTrack class="bg-border relative h-[3px] grow rounded-full">
+                  <SliderRange class="bg-accent absolute h-full rounded-full" />
+                </SliderTrack>
+                <SliderThumb
+                  class="bg-accent-light block h-3 w-3 cursor-pointer rounded-full border-2 border-[rgba(124,58,237,0.6)] focus:outline-none"
+                />
+              </SliderRoot>
             </div>
 
-            <div class="px-3 py-2.5 no-drag">
-              <div class="flex justify-between mb-1.5">
-                <span class="text-xs font-medium" style="color: var(--color-ink-2)">
-                  Overlay opacity
-                </span>
-                <span
-                  class="text-xs font-mono tabular-nums"
-                  style="color: var(--color-accent-light)"
-                >
+            <div class="no-drag px-3 py-2.5">
+              <div class="mb-2 flex justify-between">
+                <span class="text-ink-2 text-xs font-medium">Overlay opacity</span>
+                <span class="text-accent-light font-mono text-xs tabular-nums">
                   {{ Math.round(theme.opacity * 100) }}%
                 </span>
               </div>
-              <input
-                type="range"
-                min="0"
-                max="1"
-                step="0.01"
-                :value="theme.opacity"
-                class="themed-range w-full"
-                @input="theme.opacity = parseFloat(($event.target as HTMLInputElement).value)"
-                @change="theme.opacity = parseFloat(($event.target as HTMLInputElement).value)"
-              />
+              <SliderRoot
+                v-model="opacityModel"
+                :min="0"
+                :max="100"
+                :step="1"
+                class="relative flex h-4 w-full touch-none items-center select-none"
+              >
+                <SliderTrack class="bg-border relative h-[3px] grow rounded-full">
+                  <SliderRange class="bg-accent absolute h-full rounded-full" />
+                </SliderTrack>
+                <SliderThumb
+                  class="bg-accent-light block h-3 w-3 cursor-pointer rounded-full border-2 border-[rgba(124,58,237,0.6)] focus:outline-none"
+                />
+              </SliderRoot>
             </div>
           </div>
         </template>
 
-        <!-- Preview -->
         <div>
-          <div class="flex items-center gap-2 mb-1.5">
-            <span
-              class="text-xs font-semibold uppercase tracking-widest"
-              style="color: var(--color-ink-3)"
-            >
+          <div class="mb-1.5 flex items-center gap-2">
+            <span class="text-ink-3 text-xs font-semibold tracking-widest uppercase">
               Preview
             </span>
-            <div class="flex-1 h-px" style="background: var(--color-border)" />
+            <div class="bg-border h-px flex-1" />
           </div>
           <div
-            class="relative rounded-lg overflow-hidden"
+            class="relative overflow-hidden rounded-lg"
             style="height: 64px; border: 1px solid var(--color-border)"
           >
-            <!-- image layer -->
             <div
               v-if="theme.bgType === 'image' && theme.bgImageUrl"
               class="absolute inset-0"
@@ -560,53 +540,40 @@ export const ColorRow = defineComponent({
                 opacity: theme.bgImageOpacity,
               }"
             />
-            <!-- color/gradient overlay (hidden when image bg is active) -->
             <div
               v-if="theme.bgType !== 'image'"
               class="absolute inset-0"
               :style="{ background: previewBg, opacity: theme.opacity }"
             />
-            <!-- content -->
-            <div class="absolute inset-0 flex items-center px-3 gap-3">
+            <div class="absolute inset-0 flex items-center gap-3 px-3">
               <div
-                class="w-8 h-8 rounded-md shrink-0"
+                class="h-8 w-8 shrink-0 rounded-md"
                 style="
                   background: rgba(124, 58, 237, 0.25);
                   border: 1px solid rgba(124, 58, 237, 0.35);
                 "
               />
-              <div class="flex flex-col gap-1 min-w-0 flex-1">
-                <div class="flex gap-3 items-center">
-                  <span class="text-xs font-bold" style="color: var(--color-ink-1)">
-                    PlayerName
-                  </span>
-                  <span class="text-xs font-mono" style="color: var(--color-good)">6.50</span>
-                  <span class="text-xs font-mono" style="color: var(--color-warn, #fbbf24)">
-                    2.30
-                  </span>
-                  <span class="text-xs font-mono" style="color: var(--color-accent-light)">
-                    1,204
-                  </span>
+              <div class="flex min-w-0 flex-1 flex-col gap-1">
+                <div class="flex items-center gap-3">
+                  <span class="text-ink-1 text-xs font-bold">PlayerName</span>
+                  <span class="text-good font-mono text-xs">6.50</span>
+                  <span class="text-warn font-mono text-xs">2.30</span>
+                  <span class="text-accent-light font-mono text-xs">1,204</span>
                 </div>
-                <div class="h-px w-full" style="background: var(--color-border)" />
+                <div class="bg-border h-px w-full" />
               </div>
             </div>
           </div>
         </div>
       </template>
 
-      <!-- ────────────── COLORS TAB ────────────── -->
       <template v-if="activeTab === 'colors'">
-        <!-- UI colors -->
         <div>
-          <div class="flex items-center gap-2 mb-1.5">
-            <span
-              class="text-xs font-semibold uppercase tracking-widest"
-              style="color: var(--color-ink-3)"
-            >
+          <div class="mb-1.5 flex items-center gap-2">
+            <span class="text-ink-3 text-xs font-semibold tracking-widest uppercase">
               Interface
             </span>
-            <div class="flex-1 h-px" style="background: var(--color-border)" />
+            <div class="bg-border h-px flex-1" />
           </div>
           <div class="card divide-subtle">
             <ColorRow
@@ -619,16 +586,12 @@ export const ColorRow = defineComponent({
           </div>
         </div>
 
-        <!-- Rank colors -->
         <div>
-          <div class="flex items-center gap-2 mb-1.5">
-            <span
-              class="text-xs font-semibold uppercase tracking-widest"
-              style="color: var(--color-ink-3)"
-            >
+          <div class="mb-1.5 flex items-center gap-2">
+            <span class="text-ink-3 text-xs font-semibold tracking-widest uppercase">
               Rank Colors
             </span>
-            <div class="flex-1 h-px" style="background: var(--color-border)" />
+            <div class="bg-border h-px flex-1" />
           </div>
           <div class="card divide-subtle">
             <ColorRow
@@ -644,40 +607,3 @@ export const ColorRow = defineComponent({
     </div>
   </div>
 </template>
-
-<style scoped>
-.themed-range {
-  -webkit-appearance: none;
-  appearance: none;
-  height: 3px;
-  border-radius: 2px;
-  background: var(--color-border);
-  outline: none;
-  cursor: pointer;
-}
-.themed-range::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  width: 13px;
-  height: 13px;
-  border-radius: 50%;
-  background: var(--color-accent-light);
-  border: 2px solid rgba(124, 58, 237, 0.6);
-  box-shadow: 0 0 6px rgba(124, 58, 237, 0.4);
-  cursor: pointer;
-  transition:
-    transform 100ms,
-    box-shadow 100ms;
-}
-.themed-range::-webkit-slider-thumb:hover {
-  transform: scale(1.15);
-  box-shadow: 0 0 10px rgba(124, 58, 237, 0.6);
-}
-.themed-range::-moz-range-thumb {
-  width: 13px;
-  height: 13px;
-  border-radius: 50%;
-  background: var(--color-accent-light);
-  border: 2px solid rgba(124, 58, 237, 0.6);
-  cursor: pointer;
-}
-</style>
