@@ -274,7 +274,7 @@ async function doScreenshot(): Promise<void> {
         <select
           :value="config.mode"
           class="select-field"
-          style="height: 27px; font-size: 0.76rem; min-width: 98px"
+          style="height: 27px; font-size: 0.76rem; min-width: 98px; -webkit-appearance: none; appearance: none"
           @change="onModeChange"
         >
           <option
@@ -288,7 +288,7 @@ async function doScreenshot(): Promise<void> {
         <select
           :value="config.interval"
           class="select-field"
-          style="height: 27px; font-size: 0.76rem; min-width: 76px"
+          style="height: 27px; font-size: 0.76rem; min-width: 76px; -webkit-appearance: none; appearance: none"
           @change="onIntervalChange"
         >
           <option
