@@ -15,8 +15,9 @@ const router = useRouter();
 
 const isLinux = window.api.platform === 'linux';
 
-const loadingDone = ref(false);
-const appVisible = ref(false);
+const SKIP_LOADING = localStorage.getItem('skip-loading') === '1';
+const loadingDone = ref(SKIP_LOADING);
+const appVisible = ref(SKIP_LOADING);
 
 function onLoadingDone(): void {
   loadingDone.value = true;
