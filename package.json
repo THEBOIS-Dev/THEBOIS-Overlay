@@ -78,7 +78,7 @@
     "discord-rpc": "^4.0.1",
     "electron-updater": "^6.3.9",
     "electron-window-state": "^5.0.3",
-    "lucide-vue-next": "^0.511.0",
+    "lucide-vue-next": "^1.0.0",
     "pinia": "^3.0.4",
     "pinia-plugin-persistedstate": "^4.1.1",
     "radix-vue": "^1.9.9",
