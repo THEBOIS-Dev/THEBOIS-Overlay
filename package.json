@@ -73,7 +73,7 @@
     "@electron-toolkit/preload": "^3.0.1",
     "@electron-toolkit/utils": "^4.0.0",
     "@logdna/tail-file": "^4.0.2",
-    "@vueuse/core": "^13.1.0",
+    "@vueuse/core": "^14.3.0",
     "axios": "^1.16.0",
     "discord-rpc": "^4.0.1",
     "electron-updater": "^6.3.9",
