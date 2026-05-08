@@ -95,7 +95,7 @@
     "@semantic-release/npm": "^13.1.5",
     "@semantic-release/release-notes-generator": "^14.0.0",
     "@tailwindcss/vite": "^4.2.4",
-    "@types/node": "^25.6.0",
+    "@types/node": "^25.6.2",
     "@vitejs/plugin-vue": "^6.0.5",
     "@vue/eslint-config-typescript": "^14.7.0",
     "@vue/tsconfig": "^0.9.1",
