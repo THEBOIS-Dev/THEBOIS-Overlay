@@ -56,6 +56,7 @@ export interface ThemeConfig {
   bgImageOpacity: number;
   opacity: number;
   colors: ThemeColors;
+  dynamicColors: boolean;
 }
 
 export const DEFAULT_THEME_COLORS: ThemeColors = {
@@ -95,6 +96,7 @@ export const DEFAULT_THEME: ThemeConfig = {
   bgImageOpacity: 0.3,
   opacity: 0.92,
   colors: { ...DEFAULT_THEME_COLORS },
+  dynamicColors: false,
 };
 
 export interface ConfigState {
@@ -123,6 +125,11 @@ export interface ConfigState {
   discordRpcEnabled: boolean;
   autoUpdateEnabled: boolean;
   theme: ThemeConfig;
+  pikaProxyPort: number;
+  jartexProxyPort: number;
+  autoDetectNetwork: boolean;
+  proxyBindHost: '0.0.0.0' | '127.0.0.1';
+  proxyBannerDismissed: boolean;
 }
 
 const DEFAULT_COLUMNS: Column[] = [
@@ -213,6 +220,11 @@ export const useConfigStore = defineStore('config', {
     discordRpcEnabled: false,
     autoUpdateEnabled: true,
     theme: { ...DEFAULT_THEME, colors: { ...DEFAULT_THEME_COLORS } },
+    pikaProxyPort: 25566,
+    jartexProxyPort: 25567,
+    autoDetectNetwork: true,
+    proxyBindHost: '127.0.0.1',
+    proxyBannerDismissed: false,
   }),
 
   getters: {
@@ -281,9 +293,20 @@ export const useConfigStore = defineStore('config', {
         ctx.store.theme.colors = { ...DEFAULT_THEME_COLORS, ...ctx.store.theme.colors };
       }
 
+      if (ctx.store.theme.dynamicColors === undefined) {
+        ctx.store.theme.dynamicColors = false;
+      }
+
       if (!ctx.store.network) {
         ctx.store.network = 'pikanetwork';
       }
+
+      if (!ctx.store.pikaProxyPort) ctx.store.pikaProxyPort = 25566;
+      if (!ctx.store.jartexProxyPort) ctx.store.jartexProxyPort = 25567;
+      if (ctx.store.autoDetectNetwork === undefined) ctx.store.autoDetectNetwork = true;
+      if (!ctx.store.proxyBindHost) ctx.store.proxyBindHost = '127.0.0.1';
+      if (ctx.store.proxyBannerDismissed === undefined)
+        ctx.store.proxyBannerDismissed = false;
     },
   },
 });

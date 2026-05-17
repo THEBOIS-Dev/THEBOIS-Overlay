@@ -10,6 +10,7 @@ import {
   getTopRankDisplay,
   playerNameColor,
   isStaff,
+  levelColor,
   type Player,
 } from '@renderer/types';
 
@@ -20,27 +21,13 @@ const nameColor = computed(() => playerNameColor(props.player.profile));
 const topRankDisplay = computed(() => getTopRankDisplay(props.player.profile));
 const staffPlayer = computed(() => isStaff(props.player.profile));
 const clanTag = computed(() => props.player.profile?.clan?.tag ?? null);
+const statsDisabled = computed(() => props.player.error === 'stats_disabled');
 
-const CLAN_GRADIENT_STOPS = [
-  '#a78bfa',
-  '#818cf8',
-  '#38bdf8',
-  '#34d399',
-  '#fbbf24',
-  '#f472b6',
-  '#a78bfa',
-];
-const clanTagStyle = computed(() => ({
-  backgroundImage: `linear-gradient(90deg, ${CLAN_GRADIENT_STOPS.join(', ')})`,
-  backgroundClip: 'text',
-  WebkitBackgroundClip: 'text',
-  WebkitTextFillColor: 'transparent',
-  border: '1px solid rgba(167,139,250,0.3)',
-  padding: '1px 6px',
-  fontWeight: '700',
-  letterSpacing: '0.05em',
-  fontSize: '0.68rem',
-}));
+const privateLevel = computed(() => {
+  if (!statsDisabled.value) return null;
+  const lvl = props.player.profile?.rank?.level;
+  return typeof lvl === 'number' ? lvl : null;
+});
 
 const errorLabel = computed(() => {
   switch (props.player.error) {
@@ -48,6 +35,8 @@ const errorLabel = computed(() => {
       return '429';
     case 'network':
       return 'ERR';
+    case 'stats_disabled':
+      return 'PRIVATE';
     default:
       return '?';
   }
@@ -59,6 +48,8 @@ const errorColor = computed(() => {
       return 'var(--color-ink-3)';
     case 'rate_limited':
       return '#f97316';
+    case 'stats_disabled':
+      return 'var(--color-ink-3)';
     default:
       return 'var(--color-bad)';
   }
@@ -88,7 +79,9 @@ function cellColor(col: Column): string {
   <tr
     class="group glass-row animate-row-in border-b"
     style="border-color: rgba(120, 80, 255, 0.07)"
-    :class="{ 'opacity-30': player.error === 'not_found' }"
+    :class="{
+      'opacity-30': player.error === 'not_found',
+    }"
   >
     <td
       v-for="col in activeColumns"
@@ -98,6 +91,16 @@ function cellColor(col: Column): string {
     >
       <template v-if="col === Column.NAME">
         <div class="flex min-w-0 items-center gap-1.5">
+          <div
+            v-if="player.teamColor"
+            class="shrink-0 rounded-full"
+            :style="{
+              width: '3px',
+              height: '18px',
+              background: `linear-gradient(180deg, ${player.teamColor}ff 0%, ${player.teamColor}88 100%)`,
+              boxShadow: `0 0 6px 1px ${player.teamColor}77`,
+            }"
+          />
           <PlayerAvatar
             :name="player.realName || player.name"
             :size="17"
@@ -129,9 +132,8 @@ function cellColor(col: Column): string {
               <span style="color: var(--color-nick)">{{ player.name }}</span>
               <span
                 style="color: rgba(255, 255, 255, 0.2); margin: 0 3px; font-size: 0.68rem"
+                >→</span
               >
-                →
-              </span>
               <span>{{ player.realName }}</span>
             </template>
             <template v-else>{{ player.realName || player.name }}</template>
@@ -160,9 +162,14 @@ function cellColor(col: Column): string {
           </span>
           <span
             v-if="clanTag"
-            class="tag shrink-0"
-            :style="clanTagStyle"
-            >{{ clanTag }}</span
+            class="clan-badge shrink-0"
+          >
+            <span class="clan-badge-text">{{ clanTag }}</span>
+          </span>
+          <span
+            v-if="statsDisabled"
+            class="private-badge shrink-0"
+            >PRIVATE</span
           >
         </div>
       </template>
@@ -178,6 +185,7 @@ function cellColor(col: Column): string {
         <span
           v-if="
             player.error !== 'not_found' &&
+            player.error !== 'stats_disabled' &&
             (col === Column.FKDR || activeColumns.indexOf(col) === 1)
           "
           class="font-mono"
@@ -185,6 +193,18 @@ function cellColor(col: Column): string {
           :style="{ color: errorColor }"
         >
           {{ errorLabel }}
+        </span>
+        <span
+          v-else-if="
+            player.error === 'stats_disabled' &&
+            col === Column.LEVEL &&
+            privateLevel !== null
+          "
+          class="font-mono font-medium tabular-nums"
+          style="font-size: 0.85rem; letter-spacing: 0.01em"
+          :style="{ color: levelColor(privateLevel) }"
+        >
+          {{ privateLevel }}
         </span>
         <span
           v-else

@@ -69,6 +69,11 @@ const BASE_CONFIG_SEED = {
   fontSize: 18,
   roundedCorners: false,
   textShadow: true,
+  autoDetectNetwork: false,
+  pikaProxyPort: 25566,
+  jartexProxyPort: 25567,
+  proxyBindHost: '127.0.0.1',
+  proxyBannerDismissed: true,
   theme: {
     bgType: 'solid',
     bgColor: '#06091400',
@@ -134,6 +139,8 @@ async function captureShowcase(
       win.setContentSize(1400, 800);
     });
 
+    const network = (configSeed.network as string) ?? 'pikanetwork';
+
     await page.evaluate(
       ({ cfg, nicks }) => {
         localStorage.setItem('thebois-config', JSON.stringify(cfg));
@@ -147,27 +154,30 @@ async function captureShowcase(
 
     await page.waitForSelector('header', { timeout: 15_000 });
 
-    await page.waitForFunction(() => (window as any).__pinia !== undefined, {
+    await page.waitForFunction(() => (window as unknown as Record<string, unknown>)['__pinia'] !== undefined, {
       timeout: 10000,
     });
 
-    await page.evaluate(() => {
-      const pinia = (window as any).__pinia;
-      const state = pinia.state?.value;
-      if (state?.players) state.players.logPathValid = null;
-    });
-
-    const network = (configSeed.network as string) ?? 'pikanetwork';
+    await page.evaluate((net: string) => {
+      const pinia = (window as unknown as Record<string, unknown>)['__pinia'] as { state?: { value?: Record<string, unknown> } };
+      const state = pinia.state?.value as Record<string, Record<string, unknown>> | undefined;
+      if (!state) return;
+      if (state['players']) {
+        state['players']['logPathValid'] = null;
+        state['players']['proxyConnectedNetwork'] = net;
+      }
+    }, network);
 
     await page.evaluate(
       async ({ names, net }: { names: string[]; net: string }) => {
-        const pinia = (window as any).__pinia;
+        const pinia = (window as unknown as Record<string, unknown>)['__pinia'] as { state?: { value?: Record<string, unknown> } };
         if (!pinia) throw new Error('[showcase] window.__pinia not found');
-        const state = pinia.state?.value;
+        const state = pinia.state?.value as Record<string, Record<string, unknown>> | undefined;
+        if (!state) throw new Error('[showcase] pinia state not found');
         const api = net === 'jartexnetwork' ? window.api.jartex : window.api.pika;
 
         for (const name of names) {
-          state.players.players.push({
+          (state['players']['players'] as unknown[]).push({
             name,
             realName: name,
             uuid: null,
@@ -177,6 +187,8 @@ async function captureShowcase(
             profile: null,
             stats: null,
             source: 'manual' as const,
+            team: null,
+            teamColor: null,
           });
         }
 
@@ -186,34 +198,36 @@ async function captureShowcase(
 
             try {
               const result = await api.fetch(username, 'total', 'ALL_MODES');
-              const idx = state.players.players.findIndex(
-                (p: any) => p.realName.toLowerCase() === username.toLowerCase(),
+              const playerList = state['players']['players'] as Array<Record<string, unknown>>;
+              const idx = playerList.findIndex(
+                (p) => (p['realName'] as string).toLowerCase() === username.toLowerCase(),
               );
               if (idx === -1) return;
 
-              const p = state.players.players[idx];
+              const p = playerList[idx];
               if (result.notFound) {
-                p.nicked = true;
-                if (!p.profile && !p.stats) p.error = 'not_found';
+                p['nicked'] = true;
+                if (!p['profile'] && !p['stats']) p['error'] = 'not_found';
               } else if (result.rateLimit) {
-                p.error = 'rate_limited';
+                p['error'] = 'rate_limited';
               } else {
-                p.profile = result.profile;
-                p.stats = result.stats;
-                const apiName = (result.profile as any)?.username;
+                p['profile'] = result.profile;
+                p['stats'] = result.stats;
+                const apiName = (result.profile as Record<string, unknown> | null)?.['username'] as string | undefined;
                 if (apiName) {
-                  p.name = apiName;
-                  p.realName = apiName;
+                  p['name'] = apiName;
+                  p['realName'] = apiName;
                 }
               }
-              p.loading = false;
+              p['loading'] = false;
             } catch {
-              const idx = state.players.players.findIndex(
-                (p: any) => p.realName.toLowerCase() === username.toLowerCase(),
+              const playerList = state['players']['players'] as Array<Record<string, unknown>>;
+              const idx = playerList.findIndex(
+                (p) => (p['realName'] as string).toLowerCase() === username.toLowerCase(),
               );
               if (idx !== -1) {
-                state.players.players[idx].loading = false;
-                state.players.players[idx].error = 'network';
+                playerList[idx]['loading'] = false;
+                playerList[idx]['error'] = 'network';
               }
             }
           }),
@@ -242,7 +256,7 @@ async function captureShowcase(
 
     const { contentW, contentH } = await page.evaluate(
       (): { contentW: number; contentH: number } => {
-        const titleBar = document.querySelector('header')?.offsetHeight ?? 42;
+        const titleBar = (document.querySelector('header') as HTMLElement | null)?.offsetHeight ?? 42;
         const thead = document.querySelector('thead') as HTMLElement | null;
         const tbody = document.querySelector('tbody') as HTMLElement | null;
         const footer = document.querySelector('.border-t') as HTMLElement | null;

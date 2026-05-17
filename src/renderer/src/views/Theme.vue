@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { useConfigStore } from '@renderer/store/config';
-import { Blend, Image, RotateCcw, Square } from 'lucide-vue-next';
+import { Blend, Image, Palette, RotateCcw, Sparkles, Square } from 'lucide-vue-next';
 import { SliderRange, SliderRoot, SliderThumb, SliderTrack } from 'radix-vue';
-import { computed, defineComponent, h, ref } from 'vue';
+import { computed, defineComponent, h, ref, watch } from 'vue';
 
 const config = useConfigStore();
 const theme = computed(() => config.theme);
@@ -12,8 +12,6 @@ const TABS = [
   { id: 'background', label: 'Background', icon: Blend },
   { id: 'colors', label: 'Colors', icon: Palette },
 ];
-
-import { Palette } from 'lucide-vue-next';
 
 const BG_TYPES = [
   { id: 'solid', label: 'Solid', icon: Square },
@@ -32,8 +30,7 @@ const DIRECTIONS = [
   { label: '↖', value: 'to top left' },
 ];
 
-const UI_COLORS = [
-  { key: 'accent', label: 'Accent' },
+const UI_COLORS_DERIVED = [
   { key: 'accentLight', label: 'Accent Light' },
   { key: 'border', label: 'Border' },
   { key: 'ink1', label: 'Text Primary' },
@@ -59,6 +56,85 @@ const RANK_COLORS = [
   { key: 'rankElite', label: 'Elite' },
   { key: 'rankVip', label: 'VIP' },
 ];
+
+const RANK_KEYS = RANK_COLORS.map((r) => r.key);
+
+function hexToHsl(hex: string): [number, number, number] {
+  const clean = hex.replace('#', '').slice(0, 6);
+  if (clean.length < 6) return [263, 76, 58];
+  const r = parseInt(clean.slice(0, 2), 16) / 255;
+  const g = parseInt(clean.slice(2, 4), 16) / 255;
+  const b = parseInt(clean.slice(4, 6), 16) / 255;
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const l = (max + min) / 2;
+  if (max === min) return [0, 0, Math.round(l * 100)];
+  const d = max - min;
+  const s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+  let h = 0;
+  if (max === r) h = ((g - b) / d + (g < b ? 6 : 0)) / 6;
+  else if (max === g) h = ((b - r) / d + 2) / 6;
+  else h = ((r - g) / d + 4) / 6;
+  return [Math.round(h * 360), Math.round(s * 100), Math.round(l * 100)];
+}
+
+function hslToHex(h: number, s: number, l: number): string {
+  const sl = s / 100;
+  const ll = l / 100;
+  const a = sl * Math.min(ll, 1 - ll);
+  const f = (n: number): string => {
+    const k = (n + h / 30) % 12;
+    const c = ll - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
+    return Math.round(255 * c)
+      .toString(16)
+      .padStart(2, '0');
+  };
+  return `#${f(0)}${f(8)}${f(4)}`;
+}
+
+function hslToRgba(h: number, s: number, l: number, alpha: number): string {
+  const sl = s / 100;
+  const ll = l / 100;
+  const a = sl * Math.min(ll, 1 - ll);
+  const f = (n: number): number => {
+    const k = (n + h / 30) % 12;
+    return Math.round(255 * (ll - a * Math.max(Math.min(k - 3, 9 - k, 1), -1)));
+  };
+  return `rgba(${f(0)},${f(8)},${f(4)},${alpha})`;
+}
+
+function applyDynamicColors(): void {
+  const accentHex = theme.value.colors.accent;
+  if (!/^#[0-9a-fA-F]{6}/.test(accentHex)) return;
+  const [h, s, l] = hexToHsl(accentHex);
+  const sat = Math.max(s, 55);
+  const lit = Math.min(Math.max(l, 45), 62);
+  const c = theme.value.colors;
+  c.accentLight = hslToHex(h, Math.max(sat - 5, 50), Math.min(lit + 22, 83));
+  c.border = hslToRgba(h, Math.max(sat * 0.65, 38), 65, 0.18);
+  c.ink1 = hslToHex(h, 14, 93);
+  c.ink2 = hslToHex(h, 18, 63);
+  c.ink3 = hslToHex(h, 20, 42);
+  c.nick = hslToHex((h + 45) % 360, 90, 78);
+  c.good = '#34d399';
+  c.bad = '#f87171';
+  RANK_KEYS.forEach((key, i) => {
+    const rh = (h + Math.round((i * 360) / RANK_KEYS.length)) % 360;
+    (c as any)[key] = hslToHex(rh, 80, 62);
+  });
+}
+
+watch(
+  [() => theme.value.dynamicColors, () => theme.value.colors.accent],
+  ([isDynamic]) => {
+    if (isDynamic) applyDynamicColors();
+  },
+  { immediate: true },
+);
+
+function toggleDynamic(): void {
+  theme.value.dynamicColors = !theme.value.dynamicColors;
+}
 
 const solidHex = computed(() => {
   const h = theme.value.bgColor.replace('#', '').slice(0, 6).padEnd(6, '0');
@@ -196,11 +272,6 @@ const bgImageOpacityModel = opacitySliderModel('bgImageOpacity');
           "
           @click="activeTab = tab.id as any"
         >
-          <div
-            v-if="activeTab === tab.id"
-            class="absolute top-1/2 left-0 -translate-y-1/2 rounded-full"
-            style="width: 2px; height: 14px; background: var(--color-accent)"
-          />
           <div
             v-if="activeTab === tab.id"
             class="absolute inset-0 rounded-md"
@@ -568,6 +639,56 @@ const bgImageOpacityModel = opacitySliderModel('bgImageOpacity');
       </template>
 
       <template v-if="activeTab === 'colors'">
+        <div
+          class="no-drag flex items-center justify-between rounded-lg px-3 py-3 transition-all"
+          :style="
+            theme.dynamicColors
+              ? 'background:rgba(124,58,237,0.1);border:1px solid rgba(124,58,237,0.32);box-shadow:0 0 14px rgba(124,58,237,0.08)'
+              : 'background:var(--color-surface-1);border:1px solid var(--color-border)'
+          "
+        >
+          <div class="flex items-center gap-2.5">
+            <div
+              class="flex h-7 w-7 shrink-0 items-center justify-center rounded-md transition-all"
+              :style="
+                theme.dynamicColors
+                  ? 'background:rgba(124,58,237,0.28);color:var(--color-accent-light)'
+                  : 'background:var(--color-surface-2);color:var(--color-ink-3)'
+              "
+            >
+              <Sparkles :size="13" />
+            </div>
+            <div class="flex flex-col gap-0.5">
+              <span
+                class="text-xs font-semibold transition-colors"
+                :style="
+                  theme.dynamicColors
+                    ? 'color:var(--color-accent-light)'
+                    : 'color:var(--color-ink-2)'
+                "
+                >Dynamic Colors</span
+              >
+              <span style="font-size: 0.67rem; color: var(--color-ink-3)">
+                Derive all colors from accent hue
+              </span>
+            </div>
+          </div>
+          <button
+            class="no-drag relative h-5 w-9 shrink-0 rounded-full transition-all duration-200"
+            :style="
+              theme.dynamicColors
+                ? 'background:var(--color-accent)'
+                : 'background:var(--color-surface-3)'
+            "
+            @click="toggleDynamic"
+          >
+            <div
+              class="absolute top-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-all duration-200"
+              :style="theme.dynamicColors ? 'left:calc(100% - 18px)' : 'left:2px'"
+            />
+          </button>
+        </div>
+
         <div>
           <div class="mb-1.5 flex items-center gap-2">
             <span class="text-ink-3 text-xs font-semibold tracking-widest uppercase">
@@ -575,9 +696,38 @@ const bgImageOpacityModel = opacitySliderModel('bgImageOpacity');
             </span>
             <div class="bg-border h-px flex-1" />
           </div>
-          <div class="card divide-subtle">
+
+          <div class="card mb-1.5">
+            <div class="relative">
+              <ColorRow
+                label="Accent"
+                :value="theme.colors.accent"
+                @update="theme.colors.accent = $event"
+              />
+              <div
+                v-if="theme.dynamicColors"
+                class="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2"
+              >
+                <span
+                  style="
+                    font-size: 0.58rem;
+                    font-weight: 700;
+                    letter-spacing: 0.1em;
+                    color: var(--color-accent-light);
+                    opacity: 0.7;
+                  "
+                  >SOURCE</span
+                >
+              </div>
+            </div>
+          </div>
+
+          <div
+            class="card divide-subtle transition-opacity duration-200"
+            :style="theme.dynamicColors ? 'opacity:0.42;pointer-events:none' : ''"
+          >
             <ColorRow
-              v-for="c in UI_COLORS"
+              v-for="c in UI_COLORS_DERIVED"
               :key="c.key"
               :label="c.label"
               :value="(theme.colors as any)[c.key]"
@@ -593,7 +743,10 @@ const bgImageOpacityModel = opacitySliderModel('bgImageOpacity');
             </span>
             <div class="bg-border h-px flex-1" />
           </div>
-          <div class="card divide-subtle">
+          <div
+            class="card divide-subtle transition-opacity duration-200"
+            :style="theme.dynamicColors ? 'opacity:0.42;pointer-events:none' : ''"
+          >
             <ColorRow
               v-for="r in RANK_COLORS"
               :key="r.key"

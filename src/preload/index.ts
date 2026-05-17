@@ -5,16 +5,24 @@ const api = {
   platform: process.platform as string,
 
   pika: {
-    fetch: (username: string, interval = 'total', mode = 'ALL_MODES') =>
-      ipcRenderer.invoke('pika:fetch', username, interval, mode),
+    fetch: (
+      username: string,
+      interval = 'total',
+      mode = 'ALL_MODES',
+      concurrent = false,
+    ) => ipcRenderer.invoke('pika:fetch', username, interval, mode, concurrent),
     stats: (username: string, interval: string, mode: string) =>
       ipcRenderer.invoke('pika:stats', username, interval, mode),
     clan: (name: string) => ipcRenderer.invoke('pika:clan', name),
   },
 
   jartex: {
-    fetch: (username: string, interval = 'total', mode = 'ALL_MODES') =>
-      ipcRenderer.invoke('jartex:fetch', username, interval, mode),
+    fetch: (
+      username: string,
+      interval = 'total',
+      mode = 'ALL_MODES',
+      concurrent = false,
+    ) => ipcRenderer.invoke('jartex:fetch', username, interval, mode, concurrent),
     stats: (username: string, interval: string, mode: string) =>
       ipcRenderer.invoke('jartex:stats', username, interval, mode),
     clan: (name: string) => ipcRenderer.invoke('jartex:clan', name),
@@ -38,6 +46,7 @@ const api = {
   },
 
   app: {
+    getVersion: (): Promise<string> => ipcRenderer.invoke('app:get-version'),
     getPath: (name: string): Promise<string> => ipcRenderer.invoke('app:get-path', name),
     findLunarLog: (): Promise<string> => ipcRenderer.invoke('app:find-lunar-log'),
     openImageDialog: (): Promise<Electron.OpenDialogReturnValue> =>
@@ -109,6 +118,34 @@ const api = {
         );
       ipcRenderer.on('updater:status', handler);
       return () => ipcRenderer.off('updater:status', handler);
+    },
+  },
+
+  proxy: {
+    getStatus: (): Promise<{
+      pika: {
+        running: boolean;
+        port: number;
+        bindHost: string;
+        clientCount: number;
+        error: string | null;
+      };
+      jartex: {
+        running: boolean;
+        port: number;
+        bindHost: string;
+        clientCount: number;
+        error: string | null;
+      };
+    } | null> => ipcRenderer.invoke('proxy:get-status'),
+    setPort: (network: 'pikanetwork' | 'jartexnetwork', port: number): Promise<void> =>
+      ipcRenderer.invoke('proxy:set-port', network, port),
+    setBindHost: (bindHost: '0.0.0.0' | '127.0.0.1'): Promise<void> =>
+      ipcRenderer.invoke('proxy:set-bind-host', bindHost),
+    onEvent: (cb: (event: unknown) => void): (() => void) => {
+      const handler = (_: IpcRendererEvent, event: unknown): void => cb(event);
+      ipcRenderer.on('proxy:event', handler);
+      return () => ipcRenderer.off('proxy:event', handler);
     },
   },
 };
