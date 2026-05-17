@@ -4,7 +4,6 @@ import { FolderOpen, CheckCircle2, XCircle, Loader } from 'lucide-vue-next';
 import { useConfigStore } from '@renderer/store/config';
 import { usePlayersStore } from '@renderer/store/players';
 import type { LogFilePreset } from '@renderer/types';
-import ToggleSetting from '@renderer/components/ToggleSetting.vue';
 
 const config = useConfigStore();
 const players = usePlayersStore();
@@ -66,25 +65,17 @@ onMounted(() => checkPath());
         class="mt-0.5"
         style="font-size: 0.78rem; color: var(--color-ink-3)"
       >
-        Point THEBOIS at your Minecraft log file to enable auto-detection.
+        Point the overlay at your Minecraft log file to enable auto-detection.
       </p>
     </div>
 
     <div class="card flex flex-col gap-3 p-3.5">
       <div class="flex items-center justify-between">
-        <div>
-          <div
-            class="font-semibold"
-            style="font-size: 0.85rem; color: var(--color-ink-1)"
-          >
-            Log File
-          </div>
-          <div
-            class="mt-0.5"
-            style="font-size: 0.76rem; color: var(--color-ink-3)"
-          >
-            Minecraft writes chat here. THEBOIS reads it live.
-          </div>
+        <div
+          class="font-semibold"
+          style="font-size: 0.85rem; color: var(--color-ink-1)"
+        >
+          Log File
         </div>
         <div
           class="flex shrink-0 items-center gap-1.5"
@@ -180,62 +171,6 @@ onMounted(() => checkPath());
             Browse
           </button>
         </div>
-        <p style="font-size: 0.74rem; color: var(--color-ink-3)">
-          Tip: type
-          <code
-            class="rounded px-1.5 py-0.5 font-mono"
-            style="background: rgba(255, 255, 255, 0.07)"
-          >
-            /who
-          </code>
-          in-game to instantly populate the overlay.
-        </p>
-      </div>
-    </div>
-
-    <div class="card flex flex-col gap-0.5 p-3.5">
-      <div class="mb-1.5 flex items-center gap-2.5">
-        <div
-          class="h-3 w-0.5 rounded-full"
-          style="background: var(--color-accent); opacity: 0.7"
-        />
-        <span
-          class="font-semibold tracking-widest uppercase"
-          style="font-size: 0.65rem; color: var(--color-ink-3); letter-spacing: 0.1em"
-        >
-          Auto-detection
-        </span>
-        <div
-          class="h-px flex-1"
-          style="background: linear-gradient(90deg, var(--color-border), transparent)"
-        />
-      </div>
-      <div class="divide-subtle">
-        <ToggleSetting
-          label="Auto-add on join"
-          :value="config.autoAddPlayers"
-          @update="config.autoAddPlayers = $event"
-        />
-        <ToggleSetting
-          label="Auto-remove on quit"
-          :value="config.autoRemoveOnQuit"
-          @update="config.autoRemoveOnQuit = $event"
-        />
-        <ToggleSetting
-          label="Remove on final kill"
-          :value="config.autoRemoveFinalDeath"
-          @update="config.autoRemoveFinalDeath = $event"
-        />
-        <ToggleSetting
-          label="Clear on /who"
-          :value="config.autoRemoveAllOnWho"
-          @update="config.autoRemoveAllOnWho = $event"
-        />
-        <ToggleSetting
-          label="Missing players warning"
-          :value="config.missingPlayersWarning"
-          @update="config.missingPlayersWarning = $event"
-        />
       </div>
     </div>
 
@@ -245,7 +180,7 @@ onMounted(() => checkPath());
         class="btn-accent rounded-lg px-4 py-1.5 font-medium"
         style="font-size: 0.82rem"
       >
-        Done →
+        Done
       </router-link>
     </div>
   </div>

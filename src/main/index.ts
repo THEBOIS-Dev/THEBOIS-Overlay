@@ -10,6 +10,7 @@ import {
   screen,
   shell,
 } from 'electron';
+import type { ProxyEvent } from './proxy';
 import { join } from 'path';
 
 if (process.platform === 'linux') {
@@ -38,14 +39,21 @@ import fs from 'fs';
 import http from 'http';
 import https from 'https';
 import readline from 'readline';
+import { ProxyManager } from './proxy';
+import type { ProxyNetwork, ProxyBindHost } from './proxy';
+
+const DEFAULT_PIKA_PROXY_PORT = 25566;
+const DEFAULT_JARTEX_PROXY_PORT = 25567;
+const DEFAULT_PROXY_BIND_HOST: ProxyBindHost = '127.0.0.1';
 
 const PIKA_BASE = 'https://stats.pika-network.net/api';
 const JARTEX_BASE = 'https://stats.jartexnetwork.com/api';
-const TIMEOUT_MS = 8_000;
+const TIMEOUT_MS = 5_000;
 const MAX_RETRIES = 3;
-const RETRY_DELAY_MS = 1000;
+const RETRY_DELAY_MS = 700;
+const RATE_LIMIT_DELAY_MS = 3000;
 const MAX_CONCURRENT = 16;
-const CACHE_TTL_MS = 60_000;
+const CACHE_TTL_MS = 600_000;
 
 const httpAgent = new http.Agent({ keepAlive: true, maxSockets: MAX_CONCURRENT });
 const httpsAgent = new https.Agent({ keepAlive: true, maxSockets: MAX_CONCURRENT });
@@ -186,9 +194,13 @@ async function withRetry<T>(
     } catch (err) {
       lastErr = err;
       if (i < retries) {
-        const wait = delayMs * (i + 1);
+        const isRateLimit = (err as Error).message.includes('429');
+        const base = isRateLimit ? RATE_LIMIT_DELAY_MS : delayMs;
+        const wait =
+          Math.min(base * Math.pow(2, i), isRateLimit ? 15_000 : 8_000) +
+          Math.random() * 600;
         dbg.retry(
-          `attempt ${i + 1}/${retries} failed — retrying in ${wait}ms  (${(err as Error).message})`,
+          `attempt ${i + 1}/${retries} failed — retrying in ${Math.round(wait)}ms  (${(err as Error).message})`,
         );
         await sleep(wait);
       }
@@ -197,7 +209,7 @@ async function withRetry<T>(
   throw lastErr;
 }
 
-async function pikaGet<T = unknown>(url: string) {
+async function apiGet<T = unknown>(url: string) {
   await sem.acquire();
   const t0 = Date.now();
   dbg.http(`→ GET ${url}`);
@@ -225,6 +237,7 @@ async function pikaGet<T = unknown>(url: string) {
 }
 
 let win: BrowserWindow | null = null;
+let proxyManager: ProxyManager | null = null;
 
 function createWindow(): void {
   const state = windowStateKeeper({ defaultWidth: 700, defaultHeight: 460 });
@@ -287,6 +300,18 @@ void app.whenReady().then(async () => {
   app.on('browser-window-created', (_, w) => optimizer.watchWindowShortcuts(w));
   if (process.platform === 'linux') await sleep(500);
   createWindow();
+
+  proxyManager = new ProxyManager(
+    DEFAULT_PIKA_PROXY_PORT,
+    DEFAULT_JARTEX_PROXY_PORT,
+    DEFAULT_PROXY_BIND_HOST,
+  );
+  proxyManager.on('event', (event: ProxyEvent) => {
+    win?.webContents.send('proxy:event', event);
+  });
+  proxyManager
+    .startAll()
+    .catch((err) => console.error('[PROXY] Failed to start proxies:', err));
 });
 
 app.on('window-all-closed', () => {
@@ -368,36 +393,84 @@ ipcMain.handle('win:screenshot', async () => {
   if (img) clipboard.writeImage(img);
 });
 
-type PikaFetchResult = {
+type FetchResult = {
   profile: unknown;
   stats: unknown;
   notFound: boolean;
   rateLimit: boolean;
+  statsDisabled: boolean;
 };
 
-ipcMain.handle(
-  'pika:fetch',
-  (
-    _,
+function makeFetchHandler(network: 'pika' | 'jartex', base: string) {
+  return (
+    _: Electron.IpcMainInvokeEvent,
     username: string,
     interval = 'total',
     mode = 'ALL_MODES',
-  ): Promise<PikaFetchResult> => {
-    const key = `pika:${username.toLowerCase()}:${interval}:${mode}`;
-    dbg.ipc(`pika:fetch  user="${username}"  interval=${interval}  mode=${mode}`);
+    concurrent = false,
+  ): Promise<FetchResult> => {
+    const key = `${network}:${username.toLowerCase()}:${interval}:${mode}`;
+    dbg.ipc(
+      `${network}:fetch  user="${username}"  interval=${interval}  mode=${mode}  concurrent=${concurrent}`,
+    );
 
-    const cached = cache.get<PikaFetchResult>(key);
+    const cached = cache.get<FetchResult>(key);
     if (cached) return Promise.resolve(cached);
 
     return dedupe(key, async () => {
-      const cached2 = cache.get<PikaFetchResult>(key);
+      const cached2 = cache.get<FetchResult>(key);
       if (cached2) return cached2;
 
-      const profileUrl = `${PIKA_BASE}/profile/${encodeURIComponent(username)}`;
-      dbg.http(`pika:fetch profile request for "${username}"`);
+      const profileUrl = `${base}/profile/${encodeURIComponent(username)}`;
+      const directStatsUrl = `${base}/profile/${encodeURIComponent(username)}/leaderboard?type=bedwars&interval=${interval}&mode=${mode}`;
 
-      const pRes = await pikaGet(profileUrl).catch((err) => {
-        dbg.error(`pika:fetch profile "${username}" — ${(err as Error).message}`);
+      if (concurrent) {
+        const [pRes, sRes] = await Promise.all([
+          apiGet(profileUrl).catch((err) => {
+            dbg.error(
+              `${network}:fetch profile "${username}" — ${(err as Error).message}`,
+            );
+            return null;
+          }),
+          apiGet(directStatsUrl).catch((err) => {
+            dbg.error(`${network}:fetch stats "${username}" — ${(err as Error).message}`);
+            return null;
+          }),
+        ]);
+
+        const notFound = pRes !== null && (pRes.status === 404 || pRes.status === 400);
+        const rateLimit = pRes !== null && pRes.status === 429;
+
+        if (rateLimit) {
+          dbg.ipc(`${network}:fetch "${username}" → RATE LIMITED`);
+          return {
+            profile: null,
+            stats: null,
+            notFound: false,
+            rateLimit: true,
+            statsDisabled: false,
+          };
+        }
+
+        const profile = pRes?.status === 200 ? pRes.data : null;
+        const statsDisabled = sRes !== null && sRes.status === 204;
+        const stats = sRes?.status === 200 ? sRes.data : null;
+        dbg.ipc(
+          `${network}:fetch "${username}" → OK  profile=${!!profile}  stats=${!!stats}  statsDisabled=${statsDisabled}`,
+        );
+        const result: FetchResult = {
+          profile,
+          stats,
+          notFound,
+          rateLimit: false,
+          statsDisabled,
+        };
+        cache.set(key, result);
+        return result;
+      }
+
+      const pRes = await apiGet(profileUrl).catch((err) => {
+        dbg.error(`${network}:fetch profile "${username}" — ${(err as Error).message}`);
         return null;
       });
 
@@ -405,242 +478,68 @@ ipcMain.handle(
       const rateLimit = pRes !== null && pRes.status === 429;
 
       if (notFound) {
-        dbg.ipc(`pika:fetch "${username}" → NOT FOUND`);
-        const result: PikaFetchResult = {
+        dbg.ipc(`${network}:fetch "${username}" → NOT FOUND`);
+        const result: FetchResult = {
           profile: null,
           stats: null,
           notFound: true,
           rateLimit: false,
+          statsDisabled: false,
         };
         cache.set(key, result);
         return result;
       }
 
       if (rateLimit) {
-        dbg.ipc(`pika:fetch "${username}" → RATE LIMITED`);
-        return { profile: null, stats: null, notFound: false, rateLimit: true };
-      }
-
-      const profile = pRes?.status === 200 ? pRes.data : null;
-      const canonicalUsername =
-        (profile as { username?: string } | null)?.username ?? username;
-
-      dbg.http(`pika:fetch stats request for canonical="${canonicalUsername}"`);
-      const statsUrl = `${PIKA_BASE}/profile/${encodeURIComponent(canonicalUsername)}/leaderboard?type=bedwars&interval=${interval}&mode=${mode}`;
-
-      const sRes = await pikaGet(statsUrl).catch((err) => {
-        dbg.error(`pika:fetch stats "${canonicalUsername}" — ${(err as Error).message}`);
-        return null;
-      });
-
-      const stats = sRes?.status === 200 ? sRes.data : null;
-
-      dbg.ipc(
-        `pika:fetch "${canonicalUsername}" → OK  profile=${!!profile}  stats=${!!stats}`,
-      );
-
-      const result: PikaFetchResult = {
-        profile,
-        stats,
-        notFound: false,
-        rateLimit: false,
-      };
-      cache.set(key, result);
-      return result;
-    });
-  },
-);
-
-ipcMain.handle(
-  'pika:stats',
-  (_, username: string, interval: string, mode: string): Promise<unknown> => {
-    const key = `pika:stats:${username.toLowerCase()}:${interval}:${mode}`;
-    dbg.ipc(`pika:stats  user="${username}"  interval=${interval}  mode=${mode}`);
-
-    const cached = cache.get<unknown>(key);
-    if (cached) return Promise.resolve(cached);
-
-    return dedupe(key, async () => {
-      const cached2 = cache.get<unknown>(key);
-      if (cached2) return cached2;
-
-      const profileUrl = `${PIKA_BASE}/profile/${encodeURIComponent(username)}`;
-      dbg.http(`pika:stats profile request for "${username}"`);
-
-      const pRes = await pikaGet(profileUrl).catch((err) => {
-        dbg.error(`pika:stats profile "${username}" — ${(err as Error).message}`);
-        return null;
-      });
-
-      const profile = pRes?.status === 200 ? pRes.data : null;
-      const canonicalUsername =
-        (profile as { username?: string } | null)?.username ?? username;
-
-      dbg.http(`pika:stats stats request for canonical="${canonicalUsername}"`);
-      const statsUrl = `${PIKA_BASE}/profile/${encodeURIComponent(canonicalUsername)}/leaderboard?type=bedwars&interval=${interval}&mode=${mode}`;
-
-      const sRes = await pikaGet(statsUrl).catch((err) => {
-        dbg.error(`pika:stats "${canonicalUsername}" — ${(err as Error).message}`);
-        return null;
-      });
-
-      const data = sRes?.status === 200 ? sRes.data : null;
-      if (data) cache.set(key, data);
-      return data;
-    });
-  },
-);
-
-ipcMain.handle('pika:clan', (_, name: string): Promise<unknown> => {
-  const key = `pika:clan:${name.toLowerCase()}`;
-  dbg.ipc(`pika:clan  name="${name}"`);
-
-  const cached = cache.get<unknown>(key);
-  if (cached) return Promise.resolve(cached);
-
-  return dedupe(key, async () => {
-    const cached2 = cache.get<unknown>(key);
-    if (cached2) return cached2;
-
-    const url = `${PIKA_BASE}/clans/${encodeURIComponent(name)}`;
-    dbg.http(`pika:clan request for "${name}"`);
-
-    const res = await pikaGet(url).catch((err) => {
-      dbg.error(`pika:clan "${name}" — ${(err as Error).message}`);
-      return null;
-    });
-
-    if (!res) throw new Error('Network error');
-    if (res.status === 404 || res.status === 400) return { notFound: true };
-    if (res.status !== 200) throw new Error(`HTTP ${res.status}`);
-
-    const data = res.data;
-    cache.set(key, data);
-    dbg.ipc(`pika:clan "${name}" → OK`);
-    return data;
-  });
-});
-
-ipcMain.handle('jartex:clan', (_, name: string): Promise<unknown> => {
-  const key = `jartex:clan:${name.toLowerCase()}`;
-  dbg.ipc(`jartex:clan  name="${name}"`);
-
-  const cached = cache.get<unknown>(key);
-  if (cached) return Promise.resolve(cached);
-
-  return dedupe(key, async () => {
-    const cached2 = cache.get<unknown>(key);
-    if (cached2) return cached2;
-
-    const url = `${JARTEX_BASE}/clans/${encodeURIComponent(name)}`;
-    dbg.http(`jartex:clan request for "${name}"`);
-
-    const res = await pikaGet(url).catch((err) => {
-      dbg.error(`jartex:clan "${name}" — ${(err as Error).message}`);
-      return null;
-    });
-
-    if (!res) throw new Error('Network error');
-    if (res.status === 404 || res.status === 400) return { notFound: true };
-    if (res.status !== 200) throw new Error(`HTTP ${res.status}`);
-
-    const data = res.data;
-    cache.set(key, data);
-    dbg.ipc(`jartex:clan "${name}" → OK`);
-    return data;
-  });
-});
-
-type JartexFetchResult = {
-  profile: unknown;
-  stats: unknown;
-  notFound: boolean;
-  rateLimit: boolean;
-};
-
-ipcMain.handle(
-  'jartex:fetch',
-  (
-    _,
-    username: string,
-    interval = 'total',
-    mode = 'ALL_MODES',
-  ): Promise<JartexFetchResult> => {
-    const key = `jartex:${username.toLowerCase()}:${interval}:${mode}`;
-    dbg.ipc(`jartex:fetch  user="${username}"  interval=${interval}  mode=${mode}`);
-
-    const cached = cache.get<JartexFetchResult>(key);
-    if (cached) return Promise.resolve(cached);
-
-    return dedupe(key, async () => {
-      const cached2 = cache.get<JartexFetchResult>(key);
-      if (cached2) return cached2;
-
-      const profileUrl = `${JARTEX_BASE}/profile/${encodeURIComponent(username)}`;
-      dbg.http(`jartex:fetch profile request for "${username}"`);
-
-      const pRes = await pikaGet(profileUrl).catch((err) => {
-        dbg.error(`jartex:fetch profile "${username}" — ${(err as Error).message}`);
-        return null;
-      });
-
-      const notFound = pRes !== null && (pRes.status === 404 || pRes.status === 400);
-      const rateLimit = pRes !== null && pRes.status === 429;
-
-      if (notFound) {
-        dbg.ipc(`jartex:fetch "${username}" → NOT FOUND`);
-        const result: JartexFetchResult = {
+        dbg.ipc(`${network}:fetch "${username}" → RATE LIMITED`);
+        return {
           profile: null,
           stats: null,
-          notFound: true,
-          rateLimit: false,
+          notFound: false,
+          rateLimit: true,
+          statsDisabled: false,
         };
-        cache.set(key, result);
-        return result;
-      }
-
-      if (rateLimit) {
-        dbg.ipc(`jartex:fetch "${username}" → RATE LIMITED`);
-        return { profile: null, stats: null, notFound: false, rateLimit: true };
       }
 
       const profile = pRes?.status === 200 ? pRes.data : null;
       const canonicalUsername =
         (profile as { username?: string } | null)?.username ?? username;
+      const canonicalStatsUrl = `${base}/profile/${encodeURIComponent(canonicalUsername)}/leaderboard?type=bedwars&interval=${interval}&mode=${mode}`;
 
-      dbg.http(`jartex:fetch stats request for canonical="${canonicalUsername}"`);
-      const statsUrl = `${JARTEX_BASE}/profile/${encodeURIComponent(canonicalUsername)}/leaderboard?type=bedwars&interval=${interval}&mode=${mode}`;
-
-      const sRes = await pikaGet(statsUrl).catch((err) => {
+      const sRes = await apiGet(canonicalStatsUrl).catch((err) => {
         dbg.error(
-          `jartex:fetch stats "${canonicalUsername}" — ${(err as Error).message}`,
+          `${network}:fetch stats "${canonicalUsername}" — ${(err as Error).message}`,
         );
         return null;
       });
 
+      const statsDisabled = sRes !== null && sRes.status === 204;
       const stats = sRes?.status === 200 ? sRes.data : null;
-
       dbg.ipc(
-        `jartex:fetch "${canonicalUsername}" → OK  profile=${!!profile}  stats=${!!stats}`,
+        `${network}:fetch "${canonicalUsername}" → OK  profile=${!!profile}  stats=${!!stats}  statsDisabled=${statsDisabled}`,
       );
-
-      const result: JartexFetchResult = {
+      const result: FetchResult = {
         profile,
         stats,
         notFound: false,
         rateLimit: false,
+        statsDisabled,
       };
       cache.set(key, result);
       return result;
     });
-  },
-);
+  };
+}
 
-ipcMain.handle(
-  'jartex:stats',
-  (_, username: string, interval: string, mode: string): Promise<unknown> => {
-    const key = `jartex:stats:${username.toLowerCase()}:${interval}:${mode}`;
-    dbg.ipc(`jartex:stats  user="${username}"  interval=${interval}  mode=${mode}`);
+function makeStatsHandler(network: 'pika' | 'jartex', base: string) {
+  return (
+    _: Electron.IpcMainInvokeEvent,
+    username: string,
+    interval: string,
+    mode: string,
+  ): Promise<unknown> => {
+    const key = `${network}:stats:${username.toLowerCase()}:${interval}:${mode}`;
+    dbg.ipc(`${network}:stats  user="${username}"  interval=${interval}  mode=${mode}`);
 
     const cached = cache.get<unknown>(key);
     if (cached) return Promise.resolve(cached);
@@ -649,32 +548,59 @@ ipcMain.handle(
       const cached2 = cache.get<unknown>(key);
       if (cached2) return cached2;
 
-      const profileUrl = `${JARTEX_BASE}/profile/${encodeURIComponent(username)}`;
-      dbg.http(`jartex:stats profile request for "${username}"`);
+      const url = `${base}/profile/${encodeURIComponent(username)}/leaderboard?type=bedwars&interval=${interval}&mode=${mode}`;
+      dbg.http(`${network}:stats request for "${username}"`);
 
-      const pRes = await pikaGet(profileUrl).catch((err) => {
-        dbg.error(`jartex:stats profile "${username}" — ${(err as Error).message}`);
+      const res = await apiGet(url).catch((err) => {
+        dbg.error(`${network}:stats "${username}" — ${(err as Error).message}`);
         return null;
       });
 
-      const profile = pRes?.status === 200 ? pRes.data : null;
-      const canonicalUsername =
-        (profile as { username?: string } | null)?.username ?? username;
-
-      dbg.http(`jartex:stats stats request for canonical="${canonicalUsername}"`);
-      const statsUrl = `${JARTEX_BASE}/profile/${encodeURIComponent(canonicalUsername)}/leaderboard?type=bedwars&interval=${interval}&mode=${mode}`;
-
-      const sRes = await pikaGet(statsUrl).catch((err) => {
-        dbg.error(`jartex:stats "${canonicalUsername}" — ${(err as Error).message}`);
-        return null;
-      });
-
-      const data = sRes?.status === 200 ? sRes.data : null;
+      const data = res?.status === 200 ? res.data : null;
       if (data) cache.set(key, data);
       return data;
     });
-  },
-);
+  };
+}
+
+function makeClanHandler(network: 'pika' | 'jartex', base: string) {
+  return (_: Electron.IpcMainInvokeEvent, name: string): Promise<unknown> => {
+    const key = `${network}:clan:${name.toLowerCase()}`;
+    dbg.ipc(`${network}:clan  name="${name}"`);
+
+    const cached = cache.get<unknown>(key);
+    if (cached) return Promise.resolve(cached);
+
+    return dedupe(key, async () => {
+      const cached2 = cache.get<unknown>(key);
+      if (cached2) return cached2;
+
+      const url = `${base}/clans/${encodeURIComponent(name)}`;
+      dbg.http(`${network}:clan request for "${name}"`);
+
+      const res = await apiGet(url).catch((err) => {
+        dbg.error(`${network}:clan "${name}" — ${(err as Error).message}`);
+        return null;
+      });
+
+      if (!res) throw new Error('Network error');
+      if (res.status === 404 || res.status === 400) return { notFound: true };
+      if (res.status !== 200) throw new Error(`HTTP ${res.status}`);
+
+      const data = res.data;
+      cache.set(key, data);
+      dbg.ipc(`${network}:clan "${name}" → OK`);
+      return data;
+    });
+  };
+}
+
+ipcMain.handle('pika:fetch', makeFetchHandler('pika', PIKA_BASE));
+ipcMain.handle('pika:stats', makeStatsHandler('pika', PIKA_BASE));
+ipcMain.handle('pika:clan', makeClanHandler('pika', PIKA_BASE));
+ipcMain.handle('jartex:fetch', makeFetchHandler('jartex', JARTEX_BASE));
+ipcMain.handle('jartex:stats', makeStatsHandler('jartex', JARTEX_BASE));
+ipcMain.handle('jartex:clan', makeClanHandler('jartex', JARTEX_BASE));
 
 ipcMain.handle('skin:fetch', async (_, username: string) => {
   const urls = [
@@ -701,6 +627,8 @@ ipcMain.handle('skin:fetch', async (_, username: string) => {
   }
   return null;
 });
+
+ipcMain.handle('app:get-version', () => app.getVersion());
 
 ipcMain.handle('app:get-path', (_, name: string) =>
   app.getPath(name as Parameters<typeof app.getPath>[0]),
@@ -984,7 +912,6 @@ ipcMain.on('rpc:set-enabled', (_, enabled: boolean) => {
 });
 
 ipcMain.on('rpc:set-active', (_, active: boolean) => {
-  dbg.rpc(`rpc:set-active  active=${active}`);
   rpcIsActive = active;
   applyRPCActivity();
 });
@@ -1047,12 +974,25 @@ ipcMain.on('updater:install', () => {
   autoUpdater.quitAndInstall(true, true);
 });
 
+ipcMain.handle('proxy:get-status', () => proxyManager?.getStatus() ?? null);
+
+ipcMain.handle('proxy:set-port', async (_, network: ProxyNetwork, port: number) => {
+  if (!proxyManager) return;
+  await proxyManager.updatePort(network, port);
+});
+
+ipcMain.handle('proxy:set-bind-host', async (_, bindHost: ProxyBindHost) => {
+  if (!proxyManager) return;
+  await proxyManager.updateBindHost(bindHost);
+});
+
 app.on('will-quit', () => {
   void (async () => {
     stopLinuxCursorPoll();
     for (const s of registeredShortcuts) globalShortcut.unregister(s);
     await stopTail();
     await destroyRPC();
+    if (proxyManager) await proxyManager.stopAll().catch(() => {});
     cache.clear();
     httpAgent.destroy();
     httpsAgent.destroy();

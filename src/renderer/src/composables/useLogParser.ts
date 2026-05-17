@@ -29,14 +29,8 @@ const PATTERNS = {
   finalKill: /FINAL KILL/,
 };
 
-/**
- * Strip Minecraft color/format codes.
- * Handles § (U+00A7) AND U+FFFD (replacement char when § is misread as UTF-8).
- */
 export function stripColorCodes(str: string): string {
-  return str
-    .replace(/[\u00A7\uFFFD][0-9A-FK-OR]/gi, '') // §X or <FFFD>X
-    .replace(/[\u00A7\uFFFD]/g, ''); // any lone section/replacement char
+  return str.replace(/[\u00A7\uFFFD][0-9A-FK-OR]/gi, '').replace(/[\u00A7\uFFFD]/g, '');
 }
 
 export type LogEvent =

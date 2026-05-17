@@ -5,7 +5,12 @@ import tailwindcss from '@tailwindcss/vite'
 
 export default defineConfig({
   main: {
-    build: { externalizeDeps: true }
+    build: {
+      externalizeDeps: true,
+      rollupOptions: {
+        external: ['minecraft-protocol'],
+      },
+    },
   },
   preload: {
     build: { externalizeDeps: true }

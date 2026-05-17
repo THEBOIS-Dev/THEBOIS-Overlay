@@ -75,11 +75,13 @@ export interface Player {
   realName: string;
   uuid: string | null;
   loading: boolean;
-  error: 'not_found' | 'rate_limited' | 'network' | null;
+  error: 'not_found' | 'rate_limited' | 'network' | 'stats_disabled' | null;
   nicked: boolean;
   profile: PikaProfile | null;
   stats: PikaBedwarsStats | null;
   source: PlayerSource;
+  team: string | null;
+  teamColor: string | null;
 }
 
 export interface Nick {
@@ -418,6 +420,7 @@ export const COLUMNS: Record<Column, ColumnDef> = {
     label: 'Losses',
     shortLabel: 'L',
     sortable: true,
+    thresholds: [0, 50, 200, 500, 1000, 2500, 5000, 10000],
     getNum: (p) => statVal(p.stats?.['Losses']),
   },
   [Column.WLR]: {
@@ -438,6 +441,7 @@ export const COLUMNS: Record<Column, ColumnDef> = {
     label: 'FD',
     shortLabel: 'FD',
     sortable: true,
+    thresholds: [0, 100, 500, 1500, 3000, 7500, 15000, 30000],
     getNum: (p) => statVal(p.stats?.['Final deaths']),
   },
   [Column.KILLS]: {
@@ -451,6 +455,7 @@ export const COLUMNS: Record<Column, ColumnDef> = {
     label: 'Deaths',
     shortLabel: 'D',
     sortable: true,
+    thresholds: [0, 200, 1000, 3000, 7500, 15000, 30000, 60000],
     getNum: (p) => statVal(p.stats?.['Deaths']),
   },
   [Column.KDR]: {
@@ -511,6 +516,40 @@ export const NETWORKS: { value: Network; label: string }[] = [
   { value: 'jartexnetwork', label: 'JartexNetwork' },
 ];
 
+export interface ProxyStatusEntry {
+  running: boolean;
+  port: number;
+  bindHost: string;
+  clientCount: number;
+  error: string | null;
+}
+
+export interface ProxyStatusAll {
+  pika: ProxyStatusEntry;
+  jartex: ProxyStatusEntry;
+}
+
+export type ProxyEventPayload =
+  | { type: 'player-join'; network: string; username: string }
+  | { type: 'player-quit'; network: string; username: string }
+  | { type: 'teams-update'; network: string; teams: TeamInfo[] }
+  | { type: 'client-connect'; network: string; clientName: string }
+  | { type: 'client-disconnect'; network: string; clientName: string }
+  | {
+      type: 'status';
+      network: string;
+      running: boolean;
+      port: number;
+      error: string | null;
+    };
+
+export interface TeamInfo {
+  name: string;
+  displayName: string;
+  color: string;
+  players: string[];
+}
+
 declare global {
   interface Window {
     api: {
@@ -563,6 +602,7 @@ declare global {
         onForwardedMove(cb: (x: number, y: number) => void): () => void;
       };
       app: {
+        getVersion(): Promise<string>;
         getPath(name: string): Promise<string>;
         findLunarLog(): Promise<string>;
         openImageDialog(): Promise<{
@@ -604,6 +644,12 @@ declare global {
             error?: string;
           }) => void,
         ): () => void;
+      };
+      proxy: {
+        getStatus(): Promise<ProxyStatusAll | null>;
+        setPort(network: 'pikanetwork' | 'jartexnetwork', port: number): Promise<void>;
+        setBindHost(bindHost: '0.0.0.0' | '127.0.0.1'): Promise<void>;
+        onEvent(cb: (event: ProxyEventPayload) => void): () => void;
       };
     };
   }
