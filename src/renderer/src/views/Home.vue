@@ -190,6 +190,28 @@ const activeNetworkLabel = computed(() =>
 const activeNetworkPort = computed(() =>
   config.network === 'jartexnetwork' ? config.jartexProxyPort : config.pikaProxyPort,
 );
+
+function hexToRgb(hex: string): [number, number, number] {
+  const clean = hex.replace('#', '').slice(0, 6).padEnd(6, '0');
+  return [
+    parseInt(clean.slice(0, 2), 16),
+    parseInt(clean.slice(2, 4), 16),
+    parseInt(clean.slice(4, 6), 16),
+  ];
+}
+
+const headerBackground = computed(() => {
+  const t = config.theme;
+  let hex = t.bgColor;
+  if (t.bgType === 'gradient' && t.bgGradientStops.length) {
+    hex = [...t.bgGradientStops].sort((a, b) => a.position - b.position)[0].color;
+  } else if (t.bgType === 'image') {
+    hex = '#0b0f19';
+  }
+  const [r, g, b] = hexToRgb(hex);
+  const alpha = Math.max(0.05, t.opacity * 0.13);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+});
 </script>
 
 <template>
@@ -226,8 +248,8 @@ const activeNetworkPort = computed(() =>
         <div
           class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full"
           style="
-            background: rgba(124, 58, 237, 0.15);
-            border: 1px solid rgba(124, 58, 237, 0.3);
+            background: rgba(var(--color-accent-rgb), 0.12);
+            border: 1px solid rgba(var(--color-accent-rgb), 0.28);
           "
         >
           <Wifi
@@ -274,8 +296,8 @@ const activeNetworkPort = computed(() =>
           class="rounded-md px-2 py-1 font-semibold transition-all"
           style="
             font-size: 0.68rem;
-            background: rgba(124, 58, 237, 0.15);
-            border: 1px solid rgba(124, 58, 237, 0.28);
+            background: rgba(var(--color-accent-rgb), 0.12);
+            border: 1px solid rgba(var(--color-accent-rgb), 0.28);
             color: var(--color-accent-light);
           "
         >
@@ -327,7 +349,7 @@ const activeNetworkPort = computed(() =>
           style="
             background: radial-gradient(
               circle,
-              rgba(124, 58, 237, 0.12) 0%,
+              rgba(var(--color-accent-rgb), 0.12) 0%,
               transparent 70%
             );
             transform: scale(2.2);
@@ -336,13 +358,13 @@ const activeNetworkPort = computed(() =>
         <div
           class="relative flex h-14 w-14 items-center justify-center rounded-full"
           style="
-            background: rgba(124, 58, 237, 0.08);
-            border: 1px solid rgba(124, 58, 237, 0.2);
+            background: rgba(var(--color-accent-rgb), 0.08);
+            border: 1px solid rgba(var(--color-accent-rgb), 0.2);
           "
         >
           <Users
             :size="22"
-            style="color: rgba(184, 154, 255, 0.5)"
+            style="color: rgba(var(--color-accent-rgb), 0.5)"
           />
         </div>
       </div>
@@ -362,6 +384,13 @@ const activeNetworkPort = computed(() =>
     <div
       v-else
       class="themed-scroll flex-1 overflow-x-auto overflow-y-auto"
+      style="
+        background: radial-gradient(
+          ellipse at 50% 35%,
+          rgba(255, 45, 85, 0.06) 0%,
+          transparent 70%
+        );
+      "
     >
       <template v-if="hasTeamData">
         <table
@@ -371,7 +400,11 @@ const activeNetworkPort = computed(() =>
           <thead
             v-if="!config.integratedMode && config.columnLabels !== 'HIDDEN'"
             class="sticky top-0 z-10"
-            style="background: rgba(4, 6, 15, 0.97); backdrop-filter: blur(8px)"
+            :style="{
+              background: headerBackground,
+              backdropFilter: 'blur(8px)',
+              opacity: config.theme.opacity,
+            }"
           >
             <tr>
               <th
@@ -383,11 +416,11 @@ const activeNetworkPort = computed(() =>
                   COLUMNS[col].sortable ? 'cursor-pointer' : '',
                 ]"
                 style="
-                  border-color: rgba(120, 80, 255, 0.1);
+                  border-color: rgba(var(--color-accent-rgb), 0.1);
                   font-size: 0.68rem;
                   letter-spacing: 0.1em;
                   text-transform: uppercase;
-                  color: var(--color-ink-3);
+                  color: var(--color-ink-2);
                 "
                 @click="COLUMNS[col].sortable && toggleSort(col)"
               >
@@ -412,7 +445,7 @@ const activeNetworkPort = computed(() =>
               </th>
               <th
                 class="w-6 border-b"
-                style="border-color: rgba(120, 80, 255, 0.1)"
+                style="border-color: rgba(var(--color-accent-rgb), 0.1)"
               />
             </tr>
           </thead>
@@ -593,7 +626,11 @@ const activeNetworkPort = computed(() =>
           <thead
             v-if="!config.integratedMode && config.columnLabels !== 'HIDDEN'"
             class="sticky top-0 z-10"
-            style="background: rgba(4, 6, 15, 0.97); backdrop-filter: blur(8px)"
+            :style="{
+              background: headerBackground,
+              backdropFilter: 'blur(8px)',
+              opacity: config.theme.opacity,
+            }"
           >
             <tr>
               <th
@@ -605,11 +642,11 @@ const activeNetworkPort = computed(() =>
                   COLUMNS[col].sortable ? 'cursor-pointer' : '',
                 ]"
                 style="
-                  border-color: rgba(120, 80, 255, 0.1);
+                  border-color: rgba(var(--color-accent-rgb), 0.1);
                   font-size: 0.68rem;
                   letter-spacing: 0.1em;
                   text-transform: uppercase;
-                  color: var(--color-ink-3);
+                  color: var(--color-ink-2);
                 "
                 @click="COLUMNS[col].sortable && toggleSort(col)"
               >
@@ -634,7 +671,7 @@ const activeNetworkPort = computed(() =>
               </th>
               <th
                 class="w-6 border-b"
-                style="border-color: rgba(120, 80, 255, 0.1)"
+                style="border-color: rgba(var(--color-accent-rgb), 0.1)"
               />
             </tr>
           </thead>
@@ -653,12 +690,13 @@ const activeNetworkPort = computed(() =>
 
     <div
       v-if="sortedPlayers.length > 0 && !config.integratedMode"
-      class="no-drag flex shrink-0 items-center justify-between border-t px-3.5 py-1.5"
-      style="
-        border-color: rgba(120, 80, 255, 0.1);
-        background: rgba(4, 6, 15, 0.7);
-        backdrop-filter: blur(4px);
-      "
+      class="no-drag flex shrink-0 items-center justify-between px-3.5 py-1.5"
+      :style="{
+        borderTop: '0.5px solid rgba(var(--color-accent-rgb), 0.08)',
+        background: headerBackground,
+        backdropFilter: 'blur(4px)',
+        opacity: config.theme.opacity,
+      }"
     >
       <div class="flex items-center gap-2">
         <span style="font-size: 0.74rem; color: var(--color-ink-3); font-weight: 500">
@@ -670,8 +708,8 @@ const activeNetworkPort = computed(() =>
           style="
             font-size: 0.6rem;
             font-weight: 600;
-            background: rgba(124, 58, 237, 0.12);
-            border: 1px solid rgba(124, 58, 237, 0.25);
+            background: rgba(var(--color-accent-rgb), 0.12);
+            border: 1px solid rgba(var(--color-accent-rgb), 0.25);
             color: var(--color-accent-light);
           "
         >
@@ -693,9 +731,8 @@ const activeNetworkPort = computed(() =>
 .proxy-banner {
   position: relative;
   overflow: hidden;
-  border-bottom: 1px solid rgba(124, 58, 237, 0.18);
+  border-bottom: 1px solid rgba(var(--color-accent-rgb), 0.18);
 }
-
 .proxy-banner::before {
   content: '';
   position: absolute;
@@ -704,20 +741,18 @@ const activeNetworkPort = computed(() =>
   left: -100%;
   background: linear-gradient(
     105deg,
-    rgba(124, 58, 237, 0.07) 0%,
-    rgba(56, 189, 248, 0.03) 50%,
-    rgba(124, 58, 237, 0.05) 100%
+    rgba(var(--color-accent-rgb), 0.07) 0%,
+    rgba(var(--color-accent-rgb), 0.03) 50%,
+    rgba(var(--color-accent-rgb), 0.05) 100%
   );
   will-change: transform;
   animation: banner-shimmer 6s ease-in-out infinite;
   pointer-events: none;
 }
-
 .team-header-row {
   position: relative;
   overflow: hidden;
 }
-
 .team-header-row::before {
   content: '';
   position: absolute;
@@ -733,26 +768,21 @@ const activeNetworkPort = computed(() =>
   animation: team-scan 7s ease-in-out infinite;
   pointer-events: none;
 }
-
 .team-pip {
   animation: pip-breathe 2.8s ease-in-out infinite;
 }
-
 .team-pip-glow {
   animation: pip-breathe 2.8s ease-in-out infinite;
 }
-
 .team-name {
   animation: name-settle 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
-
 .team-divider {
   width: 1px;
   height: 10px;
   border-radius: 1px;
   flex-shrink: 0;
 }
-
 @keyframes pip-breathe {
   0%,
   100% {
@@ -764,7 +794,6 @@ const activeNetworkPort = computed(() =>
     transform: scale(0.8);
   }
 }
-
 @keyframes team-scan {
   0% {
     transform: translateX(0);
@@ -785,7 +814,6 @@ const activeNetworkPort = computed(() =>
     opacity: 0;
   }
 }
-
 @keyframes name-settle {
   from {
     opacity: 0;

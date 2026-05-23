@@ -45,46 +45,53 @@ const renderedContent = computed((): string => {
 
 type AlertType = 'info' | 'warning' | 'update' | 'maintenance';
 
-const alertMeta: Record<
-  AlertType,
-  {
-    icon: typeof Info;
-    color: string;
-    glow: string;
-    label: string;
-  }
-> = {
-  info: {
-    icon: Info,
-    color: '#60a5fa',
-    glow: 'rgba(96,165,250,0.28)',
-    label: 'Information',
-  },
+function getCSSVar(name: string): string {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+}
 
-  warning: {
-    icon: AlertTriangle,
-    color: '#fbbf24',
-    glow: 'rgba(251,191,36,0.28)',
-    label: 'Warning',
+const alertMeta = computed(
+  (): Record<
+    AlertType,
+    {
+      icon: typeof Info;
+      color: string;
+      glow: string;
+      label: string;
+    }
+  > => {
+    const accent = getCSSVar('--color-accent');
+    const accentRgb = getCSSVar('--color-accent-rgb');
+    return {
+      info: {
+        icon: Info,
+        color: '#60a5fa',
+        glow: 'rgba(96,165,250,0.28)',
+        label: 'Information',
+      },
+      warning: {
+        icon: AlertTriangle,
+        color: '#fbbf24',
+        glow: 'rgba(251,191,36,0.28)',
+        label: 'Warning',
+      },
+      update: {
+        icon: ArrowUpCircle,
+        color: accent,
+        glow: `rgba(${accentRgb},0.28)`,
+        label: 'Update',
+      },
+      maintenance: {
+        icon: Wrench,
+        color: '#94a3b8',
+        glow: 'rgba(148,163,184,0.28)',
+        label: 'Maintenance',
+      },
+    };
   },
-
-  update: {
-    icon: ArrowUpCircle,
-    color: '#a78bfa',
-    glow: 'rgba(167,139,250,0.28)',
-    label: 'Update',
-  },
-
-  maintenance: {
-    icon: Wrench,
-    color: '#94a3b8',
-    glow: 'rgba(148,163,184,0.28)',
-    label: 'Maintenance',
-  },
-};
+);
 
 const currentAlertMeta = computed(
-  () => alertMeta[(props.alert?.type as AlertType) ?? 'info'],
+  () => alertMeta.value[(props.alert?.type as AlertType) ?? 'info'],
 );
 
 onMounted(() => {
@@ -251,7 +258,7 @@ function handleClose(): void {
 }
 
 .backdrop.visible {
-  background: rgba(2, 1, 14, 0.7);
+  background: rgba(0, 0, 0, 0.7);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   pointer-events: all;
@@ -264,13 +271,13 @@ function handleClose(): void {
   max-height: calc(100vh - 80px);
   display: flex;
   flex-direction: column;
-  background: rgba(6, 4, 18, 0.97);
-  border: 1px solid rgba(120, 80, 255, 0.2);
+  background: rgba(var(--color-bg-rgb), 0.97);
+  border: 1px solid rgba(var(--color-accent-rgb), 0.2);
   border-radius: 16px;
   box-shadow:
     0 0 0 1px rgba(255, 255, 255, 0.045) inset,
     0 32px 80px rgba(0, 0, 0, 0.7),
-    0 0 60px rgba(124, 58, 237, 0.1);
+    0 0 60px rgba(var(--color-accent-rgb), 0.1);
   opacity: 0;
   transform: scale(0.95) translateY(16px);
   transition:
@@ -293,7 +300,7 @@ function handleClose(): void {
   height: 160px;
   background: radial-gradient(
     ellipse at 50% 0%,
-    rgba(124, 58, 237, 0.32) 0%,
+    rgba(var(--color-accent-rgb), 0.32) 0%,
     transparent 65%
   );
   pointer-events: none;
@@ -318,10 +325,10 @@ function handleClose(): void {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  color: #a78bfa;
-  background: rgba(124, 58, 237, 0.15);
-  border: 1px solid rgba(124, 58, 237, 0.3);
-  box-shadow: 0 0 12px rgba(124, 58, 237, 0.22);
+  color: var(--color-accent-light);
+  background: rgba(var(--color-accent-rgb), 0.15);
+  border: 1px solid rgba(var(--color-accent-rgb), 0.3);
+  box-shadow: 0 0 12px rgba(var(--color-accent-rgb), 0.22);
 }
 
 .header-text {
@@ -338,7 +345,7 @@ function handleClose(): void {
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: #a78bfa;
+  color: var(--color-accent-light);
   flex-shrink: 0;
 }
 
@@ -346,9 +353,9 @@ function handleClose(): void {
   font-size: 10.5px;
   font-weight: 600;
   font-family: var(--font-mono);
-  color: #7c3aed;
-  background: rgba(124, 58, 237, 0.14);
-  border: 1px solid rgba(124, 58, 237, 0.3);
+  color: var(--color-accent);
+  background: rgba(var(--color-accent-rgb), 0.14);
+  border: 1px solid rgba(var(--color-accent-rgb), 0.3);
   border-radius: 5px;
   padding: 1px 7px;
   letter-spacing: 0.03em;
@@ -393,8 +400,8 @@ function handleClose(): void {
   background: linear-gradient(
     90deg,
     transparent 0%,
-    rgba(120, 80, 255, 0.3) 15%,
-    rgba(120, 80, 255, 0.3) 85%,
+    rgba(var(--color-accent-rgb), 0.3) 15%,
+    rgba(var(--color-accent-rgb), 0.3) 85%,
     transparent 100%
   );
   flex-shrink: 0;
@@ -436,7 +443,7 @@ function handleClose(): void {
   overflow-y: auto;
   padding: 14px 16px 6px;
   scrollbar-width: thin;
-  scrollbar-color: rgba(124, 58, 237, 0.18) transparent;
+  scrollbar-color: rgba(var(--color-accent-rgb), 0.18) transparent;
   min-height: 0;
 }
 
@@ -450,7 +457,7 @@ function handleClose(): void {
 .markdown-content :deep(h2),
 .markdown-content :deep(h3),
 .markdown-content :deep(h4) {
-  color: #ede9ff;
+  color: var(--color-ink-1);
   font-weight: 700;
   margin: 1.1em 0 0.45em;
   line-height: 1.3;
@@ -502,11 +509,11 @@ function handleClose(): void {
 }
 
 .markdown-content :deep(li::marker) {
-  color: rgba(124, 58, 237, 0.7);
+  color: rgba(var(--color-accent-rgb), 0.7);
 }
 
 .markdown-content :deep(strong) {
-  color: #ede9ff;
+  color: var(--color-ink-1);
   font-weight: 600;
 }
 
@@ -518,16 +525,16 @@ function handleClose(): void {
 .markdown-content :deep(code) {
   font-family: var(--font-mono);
   font-size: 11.5px;
-  background: rgba(124, 58, 237, 0.12);
-  border: 1px solid rgba(124, 58, 237, 0.2);
+  background: rgba(var(--color-accent-rgb), 0.12);
+  border: 1px solid rgba(var(--color-accent-rgb), 0.2);
   border-radius: 4px;
   padding: 1px 5px;
-  color: #c4b5fd;
+  color: var(--color-accent-light);
 }
 
 .markdown-content :deep(pre) {
   background: rgba(0, 0, 0, 0.35);
-  border: 1px solid rgba(120, 80, 255, 0.15);
+  border: 1px solid rgba(var(--color-accent-rgb), 0.15);
   border-radius: 8px;
   padding: 12px 14px;
   overflow-x: auto;
@@ -538,22 +545,22 @@ function handleClose(): void {
   background: none;
   border: none;
   padding: 0;
-  color: #a5b4fc;
+  color: var(--color-accent-light);
   font-size: 11.5px;
 }
 
 .markdown-content :deep(blockquote) {
-  border-left: 3px solid rgba(124, 58, 237, 0.5);
+  border-left: 3px solid rgba(var(--color-accent-rgb), 0.5);
   margin: 0.8em 0;
   padding: 6px 12px;
   color: rgba(255, 255, 255, 0.58);
   font-style: italic;
-  background: rgba(124, 58, 237, 0.06);
+  background: rgba(var(--color-accent-rgb), 0.06);
   border-radius: 0 6px 6px 0;
 }
 
 .markdown-content :deep(a) {
-  color: #a78bfa;
+  color: var(--color-accent-light);
   text-decoration: none;
 }
 
@@ -564,7 +571,7 @@ function handleClose(): void {
 .markdown-content :deep(hr) {
   border: none;
   height: 1px;
-  background: rgba(120, 80, 255, 0.2);
+  background: rgba(var(--color-accent-rgb), 0.2);
   margin: 1em 0;
 }
 
@@ -580,8 +587,8 @@ function handleClose(): void {
   text-align: left;
   color: rgba(255, 255, 255, 0.9);
   font-weight: 600;
-  border-bottom: 1px solid rgba(120, 80, 255, 0.25);
-  background: rgba(124, 58, 237, 0.08);
+  border-bottom: 1px solid rgba(var(--color-accent-rgb), 0.25);
+  background: rgba(var(--color-accent-rgb), 0.08);
 }
 
 .markdown-content :deep(td) {
@@ -602,9 +609,9 @@ function handleClose(): void {
   font-weight: 600;
   padding: 7px 20px;
   border-radius: 8px;
-  border: 1px solid rgba(124, 58, 237, 0.35);
-  background: rgba(124, 58, 237, 0.16);
-  color: #c4b5fd;
+  border: 1px solid rgba(var(--color-accent-rgb), 0.35);
+  background: rgba(var(--color-accent-rgb), 0.16);
+  color: var(--color-accent-light);
   cursor: pointer;
   letter-spacing: 0.02em;
   transition:
@@ -615,9 +622,9 @@ function handleClose(): void {
 }
 
 .dismiss-btn:hover {
-  background: rgba(124, 58, 237, 0.28);
-  border-color: rgba(124, 58, 237, 0.55);
-  color: #e0d4ff;
-  box-shadow: 0 0 18px rgba(124, 58, 237, 0.2);
+  background: rgba(var(--color-accent-rgb), 0.28);
+  border-color: rgba(var(--color-accent-rgb), 0.55);
+  color: var(--color-ink-1);
+  box-shadow: 0 0 18px rgba(var(--color-accent-rgb), 0.2);
 }
 </style>

@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia';
 import type { PiniaPluginContext } from 'pinia';
 import 'pinia-plugin-persistedstate';
+import { DEFAULT_PALETTE_ID, getPalette } from '@renderer/palettes';
 import {
   Column,
   type BedwarsMode,
@@ -60,36 +61,36 @@ export interface ThemeConfig {
 }
 
 export const DEFAULT_THEME_COLORS: ThemeColors = {
-  accent: '#7c3aed',
-  accentLight: '#b89aff',
-  border: 'rgba(120,80,255,0.18)',
-  ink1: '#e8e0ff',
-  ink2: '#a89bc2',
-  ink3: '#6b5e82',
+  accent: '#f97316',
+  accentLight: '#fdba74',
+  border: 'rgba(249,115,22,0.16)',
+  ink1: '#fff3e8',
+  ink2: '#b08060',
+  ink3: '#6b4a2c',
   nick: '#fde68a',
   good: '#34d399',
   bad: '#f87171',
-  rankOwner: '#BC4141',
-  rankDeveloper: '#FF5555',
-  rankManager: '#AA0000',
-  rankAdmin: '#FF5555',
-  rankSrmod: '#00AAAA',
-  rankModerator: '#00AA00',
-  rankHelper: '#5555FF',
-  rankTrial: '#55FFFF',
-  rankYoutuber: '#FF5555',
-  rankChampion: '#FF5555',
-  rankTitan: '#FFD700',
-  rankElite: '#55FFFF',
-  rankVip: '#55FF55',
+  rankOwner: '#ff4d6d',
+  rankDeveloper: '#a855f7',
+  rankManager: '#ec4899',
+  rankAdmin: '#ef4444',
+  rankSrmod: '#f97316',
+  rankModerator: '#eab308',
+  rankHelper: '#22c55e',
+  rankTrial: '#06b6d4',
+  rankYoutuber: '#ff0000',
+  rankChampion: '#3b82f6',
+  rankTitan: '#8b5cf6',
+  rankElite: '#14b8a6',
+  rankVip: '#facc15',
 };
 
 export const DEFAULT_THEME: ThemeConfig = {
   bgType: 'solid',
-  bgColor: '#06091400',
+  bgColor: '#0b0704',
   bgGradientStops: [
-    { color: '#7c3aed', position: 0 },
-    { color: '#06091a', position: 100 },
+    { color: '#f97316', position: 0 },
+    { color: '#0b0704', position: 100 },
   ],
   bgGradientDir: 'to bottom right',
   bgImageUrl: '',
@@ -125,6 +126,8 @@ export interface ConfigState {
   discordRpcEnabled: boolean;
   autoUpdateEnabled: boolean;
   theme: ThemeConfig;
+  paletteId: string;
+  lowEndMode: boolean;
   pikaProxyPort: number;
   jartexProxyPort: number;
   autoDetectNetwork: boolean;
@@ -142,6 +145,18 @@ const DEFAULT_COLUMNS: Column[] = [
   Column.WLR,
   Column.WIN_STREAK,
 ];
+
+const CONFIG_VERSION = 4;
+
+interface ConfigMigration {
+  keys: (keyof ConfigState)[];
+}
+
+const CONFIG_MIGRATIONS: Record<number, ConfigMigration> = {
+  2: { keys: ['theme', 'fontSize', 'opacity', 'roundedCorners', 'textShadow'] },
+  3: { keys: ['paletteId'] },
+  4: { keys: ['lowEndMode'] },
+};
 
 const VALID_COLUMNS = new Set<string>(Object.values(Column));
 
@@ -193,8 +208,8 @@ function buildPresetPaths(
   };
 }
 
-export const useConfigStore = defineStore('config', {
-  state: (): ConfigState => ({
+function makeDefaultState(): ConfigState {
+  return {
     network: 'pikanetwork',
     logFilePath: '',
     logFilePathPreset: 'STANDARD',
@@ -220,12 +235,18 @@ export const useConfigStore = defineStore('config', {
     discordRpcEnabled: false,
     autoUpdateEnabled: true,
     theme: { ...DEFAULT_THEME, colors: { ...DEFAULT_THEME_COLORS } },
+    paletteId: DEFAULT_PALETTE_ID,
+    lowEndMode: false,
     pikaProxyPort: 25566,
     jartexProxyPort: 25567,
     autoDetectNetwork: true,
     proxyBindHost: '127.0.0.1',
     proxyBannerDismissed: false,
-  }),
+  };
+}
+
+export const useConfigStore = defineStore('config', {
+  state: makeDefaultState,
 
   getters: {
     bgColor(state): string {
@@ -250,8 +271,19 @@ export const useConfigStore = defineStore('config', {
   },
 
   actions: {
+    applyPalette(id: string): void {
+      const palette = getPalette(id);
+      if (!palette) return;
+      this.paletteId = id;
+      this.theme.bgColor = palette.bg;
+      this.theme.bgType = 'solid';
+      this.theme.colors = { ...palette.colors };
+      this.theme.dynamicColors = false;
+    },
+
     resetTheme(): void {
       this.theme = { ...DEFAULT_THEME, colors: { ...DEFAULT_THEME_COLORS } };
+      this.paletteId = DEFAULT_PALETTE_ID;
     },
 
     async findLunarLogPath(): Promise<string> {
@@ -281,6 +313,26 @@ export const useConfigStore = defineStore('config', {
     key: 'thebois-config',
     storage: localStorage,
     afterHydrate: (ctx: PiniaPluginContext) => {
+      const storedVersion = parseInt(
+        localStorage.getItem('thebois-config-version') ?? '0',
+        10,
+      );
+
+      if (storedVersion < CONFIG_VERSION) {
+        const defaults = makeDefaultState();
+        for (let v = storedVersion + 1; v <= CONFIG_VERSION; v++) {
+          const migration = CONFIG_MIGRATIONS[v];
+          if (migration) {
+            for (const key of migration.keys) {
+              (ctx.store as Record<string, unknown>)[key] = (
+                defaults as Record<string, unknown>
+              )[key];
+            }
+          }
+        }
+        localStorage.setItem('thebois-config-version', String(CONFIG_VERSION));
+      }
+
       const cols = ctx.store.activeColumns;
       const valid = Array.isArray(cols)
         ? (cols as string[]).filter((c) => VALID_COLUMNS.has(c))
@@ -297,6 +349,10 @@ export const useConfigStore = defineStore('config', {
         ctx.store.theme.dynamicColors = false;
       }
 
+      if (!ctx.store.paletteId) {
+        ctx.store.paletteId = DEFAULT_PALETTE_ID;
+      }
+
       if (!ctx.store.network) {
         ctx.store.network = 'pikanetwork';
       }
@@ -307,6 +363,8 @@ export const useConfigStore = defineStore('config', {
       if (!ctx.store.proxyBindHost) ctx.store.proxyBindHost = '127.0.0.1';
       if (ctx.store.proxyBannerDismissed === undefined)
         ctx.store.proxyBannerDismissed = false;
+
+      if (ctx.store.lowEndMode === undefined) ctx.store.lowEndMode = false;
     },
   },
 });

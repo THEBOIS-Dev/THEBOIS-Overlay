@@ -90,7 +90,7 @@ function save(): void {
       >
         <thead
           class="sticky top-0 z-10"
-          style="background: rgba(4, 6, 15, 0.97)"
+          style="background: rgba(var(--color-bg-rgb), 0.97)"
         >
           <tr
             class="border-b"
@@ -124,7 +124,7 @@ function save(): void {
             v-for="nick in nicks.nicks"
             :key="nick.id"
             class="group glass-row border-b"
-            style="border-color: rgba(120, 80, 255, 0.07)"
+            style="border-color: rgba(var(--color-accent-rgb), 0.07)"
           >
             <td
               class="px-3.5 py-2.5 font-mono font-medium"
@@ -174,13 +174,13 @@ function save(): void {
         <DialogContent
           class="animate-slide-up fixed top-1/2 left-1/2 z-50 flex w-72 -translate-x-1/2 -translate-y-1/2 flex-col gap-4 shadow-2xl focus:outline-none"
           style="
-            background: rgba(9, 6, 22, 0.99);
+            background: rgba(var(--color-bg-rgb), 0.99);
             border: 1px solid var(--color-border);
             border-radius: var(--radius-xl);
             padding: 1.25rem;
             box-shadow:
               0 24px 64px rgba(0, 0, 0, 0.7),
-              0 0 0 1px rgba(124, 58, 237, 0.1);
+              0 0 0 1px rgba(var(--color-accent-rgb), 0.1);
           "
         >
           <h3

@@ -40,9 +40,11 @@ function onKey(e: KeyboardEvent): void {
           fontSize: '0.72rem',
           width: '140px',
           color: capturing ? 'var(--color-accent-light)' : 'var(--color-ink-1)',
-          borderColor: capturing ? 'rgba(124,58,237,0.55)' : undefined,
-          boxShadow: capturing ? '0 0 0 2.5px rgba(124,58,237,0.16)' : undefined,
-          background: capturing ? 'rgba(124,58,237,0.07)' : undefined,
+          borderColor: capturing ? 'rgba(var(--color-accent-rgb),0.55)' : undefined,
+          boxShadow: capturing
+            ? '0 0 0 2.5px rgba(var(--color-accent-rgb),0.16)'
+            : undefined,
+          background: capturing ? 'rgba(var(--color-accent-rgb),0.07)' : undefined,
         }"
         @click="capturing = true"
         @keydown.stop="onKey"

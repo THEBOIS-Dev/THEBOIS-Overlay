@@ -126,7 +126,7 @@ onMounted(() => checkPath());
             style="font-size: 0.76rem"
             :style="
               config.logFilePathPreset === preset.value
-                ? 'background:var(--color-accent-dim);border:1px solid rgba(124,58,237,0.38);color:var(--color-accent-light)'
+                ? 'background:var(--color-accent-dim);border:1px solid rgba(var(--color-accent-rgb),0.38);color:var(--color-accent-light)'
                 : 'background:rgba(255,255,255,0.03);border:1px solid var(--color-border);color:var(--color-ink-3)'
             "
             @click="applyPreset(preset.value)"

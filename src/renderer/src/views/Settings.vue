@@ -436,12 +436,12 @@ const PROXY_ENTRIES = computed(() => [
                 :style="{
                   background: config.autoDetectNetwork
                     ? 'var(--color-accent)'
-                    : 'rgba(140,100,255,0.14)',
+                    : 'rgba(var(--color-accent-rgb),0.12)',
                   border: config.autoDetectNetwork
-                    ? '1px solid rgba(140,80,255,0.5)'
-                    : '1px solid rgba(140,100,255,0.25)',
+                    ? '1px solid rgba(var(--color-accent-rgb),0.5)'
+                    : '1px solid rgba(var(--color-accent-rgb),0.25)',
                   boxShadow: config.autoDetectNetwork
-                    ? '0 0 10px rgba(124,58,237,0.35)'
+                    ? '0 0 10px rgba(var(--color-accent-rgb), 0.35)'
                     : 'none',
                 }"
                 @click="config.autoDetectNetwork = !config.autoDetectNetwork"
@@ -523,14 +523,14 @@ const PROXY_ENTRIES = computed(() => [
                   background:
                     config.proxyBindHost === '0.0.0.0'
                       ? 'var(--color-accent)'
-                      : 'rgba(140,100,255,0.14)',
+                      : 'rgba(var(--color-accent-rgb),0.12)',
                   border:
                     config.proxyBindHost === '0.0.0.0'
-                      ? '1px solid rgba(140,80,255,0.5)'
-                      : '1px solid rgba(140,100,255,0.25)',
+                      ? '1px solid rgba(var(--color-accent-rgb),0.5)'
+                      : '1px solid rgba(var(--color-accent-rgb),0.25)',
                   boxShadow:
                     config.proxyBindHost === '0.0.0.0'
-                      ? '0 0 10px rgba(124,58,237,0.35)'
+                      ? '0 0 10px rgba(var(--color-accent-rgb), 0.35)'
                       : 'none',
                 }"
                 @click="
@@ -721,6 +721,41 @@ const PROXY_ENTRIES = computed(() => [
           />
         </Section>
 
+        <Section title="Performance">
+          <div
+            class="setting-panel flex items-center justify-between gap-3 rounded-xl px-3 py-2.5"
+          >
+            <div>
+              <div class="panel-label">Low-end device mode</div>
+              <div class="panel-desc mt-0.5">
+                Disables backdrop blur, all looping animations, expensive filters, and
+                ambient layers. Replaces the loading video with a lightweight screen.
+                Recommended for older or integrated-GPU hardware.
+              </div>
+            </div>
+            <button
+              class="no-drag mini-toggle relative shrink-0 rounded-full"
+              :style="{
+                background: config.lowEndMode
+                  ? 'var(--color-accent)'
+                  : 'rgba(var(--color-accent-rgb),0.12)',
+                border: config.lowEndMode
+                  ? '1px solid rgba(var(--color-accent-rgb),0.5)'
+                  : '1px solid rgba(var(--color-accent-rgb),0.25)',
+                boxShadow: config.lowEndMode
+                  ? '0 0 10px rgba(var(--color-accent-rgb), 0.35)'
+                  : 'none',
+              }"
+              @click="config.lowEndMode = !config.lowEndMode"
+            >
+              <span
+                class="mini-toggle-thumb"
+                :style="{ left: config.lowEndMode ? '19px' : '3px' }"
+              />
+            </button>
+          </div>
+        </Section>
+
         <Section title="Updates">
           <ToggleSetting
             label="Auto-update on launch"
@@ -778,7 +813,7 @@ const PROXY_ENTRIES = computed(() => [
 <style scoped>
 .settings-sidebar {
   width: 126px;
-  border-color: rgba(120, 80, 255, 0.12);
+  border-color: rgba(var(--color-accent-rgb), 0.12);
   background: rgba(255, 255, 255, 0.01);
 }
 
@@ -801,10 +836,10 @@ const PROXY_ENTRIES = computed(() => [
 .tab-bg {
   background: linear-gradient(
     105deg,
-    rgba(124, 58, 237, 0.14) 0%,
-    rgba(124, 58, 237, 0.06) 100%
+    rgba(var(--color-accent-rgb), 0.14) 0%,
+    rgba(var(--color-accent-rgb), 0.06) 100%
   );
-  border: 1px solid rgba(124, 58, 237, 0.18);
+  border: 1px solid rgba(var(--color-accent-rgb), 0.18);
 }
 
 .tab-label {
@@ -817,20 +852,20 @@ const PROXY_ENTRIES = computed(() => [
   font-weight: 600;
   background: rgba(255, 255, 255, 0.04);
   color: var(--color-ink-3);
-  border: 1px solid rgba(120, 80, 255, 0.15);
+  border: 1px solid rgba(var(--color-accent-rgb), 0.15);
   cursor: pointer;
   transition: all 150ms ease;
 }
 
 .label-btn:hover {
   color: var(--color-ink-2);
-  border-color: rgba(120, 80, 255, 0.28);
+  border-color: rgba(var(--color-accent-rgb), 0.28);
 }
 
 .label-btn--active {
-  background: rgba(124, 58, 237, 0.14);
+  background: rgba(var(--color-accent-rgb), 0.14);
   color: var(--color-accent-light);
-  border-color: rgba(124, 58, 237, 0.35);
+  border-color: rgba(var(--color-accent-rgb), 0.35);
 }
 
 .group-label {
@@ -858,8 +893,8 @@ const PROXY_ENTRIES = computed(() => [
 }
 
 .active-col-row {
-  background: rgba(124, 58, 237, 0.1);
-  border: 1px solid rgba(124, 58, 237, 0.2);
+  background: rgba(var(--color-accent-rgb), 0.1);
+  border: 1px solid rgba(var(--color-accent-rgb), 0.2);
 }
 
 .inactive-col-row {
@@ -870,7 +905,7 @@ const PROXY_ENTRIES = computed(() => [
 
 .inactive-col-row:hover {
   background: rgba(255, 255, 255, 0.04);
-  border-color: rgba(120, 80, 255, 0.2);
+  border-color: rgba(var(--color-accent-rgb), 0.2);
 }
 
 .add-label {
@@ -889,13 +924,13 @@ const PROXY_ENTRIES = computed(() => [
 
 .sort-row:hover:not(.sort-row--active) {
   background: rgba(255, 255, 255, 0.04);
-  border-color: rgba(120, 80, 255, 0.2);
+  border-color: rgba(var(--color-accent-rgb), 0.2);
   color: var(--color-ink-2);
 }
 
 .sort-row--active {
-  background: rgba(124, 58, 237, 0.12);
-  border-color: rgba(124, 58, 237, 0.28);
+  background: rgba(var(--color-accent-rgb), 0.12);
+  border-color: rgba(var(--color-accent-rgb), 0.28);
   color: var(--color-accent-light);
 }
 
@@ -1018,36 +1053,36 @@ const PROXY_ENTRIES = computed(() => [
 }
 
 .proxy-port-input:focus {
-  border-color: rgba(124, 58, 237, 0.45);
-  background: rgba(124, 58, 237, 0.06);
+  border-color: rgba(var(--color-accent-rgb), 0.45);
+  background: rgba(var(--color-accent-rgb), 0.06);
 }
 
 .apply-btn {
   font-size: 0.72rem;
   padding: 5px 10px;
-  border: 1px solid rgba(120, 80, 255, 0.2);
+  border: 1px solid rgba(var(--color-accent-rgb), 0.2);
   color: var(--color-ink-2);
   border-radius: 7px;
   transition: all 140ms ease;
 }
 
 .apply-btn:hover {
-  border-color: rgba(124, 58, 237, 0.38);
+  border-color: rgba(var(--color-accent-rgb), 0.38);
   color: var(--color-ink-1);
-  background: rgba(124, 58, 237, 0.08);
+  background: rgba(var(--color-accent-rgb), 0.08);
 }
 
 .action-btn {
   font-size: 0.74rem;
   padding: 5px 11px;
-  border: 1px solid rgba(120, 80, 255, 0.18);
+  border: 1px solid rgba(var(--color-accent-rgb), 0.18);
   color: var(--color-ink-2);
   transition: all 150ms ease;
 }
 
 .action-btn:hover {
   color: var(--color-ink-1);
-  border-color: rgba(120, 80, 255, 0.32);
+  border-color: rgba(var(--color-accent-rgb), 0.32);
   background: rgba(255, 255, 255, 0.05);
 }
 

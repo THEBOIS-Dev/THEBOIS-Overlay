@@ -1,14 +1,24 @@
 <script setup lang="ts">
+import { getAllPalettes } from '@renderer/palettes';
 import { useConfigStore } from '@renderer/store/config';
-import { Blend, Image, Palette, RotateCcw, Sparkles, Square } from 'lucide-vue-next';
+import {
+  Blend,
+  Image,
+  Layers,
+  Palette,
+  RotateCcw,
+  Sparkles,
+  Square,
+} from 'lucide-vue-next';
 import { SliderRange, SliderRoot, SliderThumb, SliderTrack } from 'radix-vue';
-import { computed, defineComponent, h, ref, watch } from 'vue';
+import { computed, defineComponent, h, ref } from 'vue';
 
 const config = useConfigStore();
 const theme = computed(() => config.theme);
-const activeTab = ref<'background' | 'colors'>('background');
+const activeTab = ref<'palette' | 'background' | 'colors'>('palette');
 
 const TABS = [
+  { id: 'palette', label: 'Palette', icon: Layers },
   { id: 'background', label: 'Background', icon: Blend },
   { id: 'colors', label: 'Colors', icon: Palette },
 ];
@@ -57,80 +67,11 @@ const RANK_COLORS = [
   { key: 'rankVip', label: 'VIP' },
 ];
 
-const RANK_KEYS = RANK_COLORS.map((r) => r.key);
+const palettes = getAllPalettes();
 
-function hexToHsl(hex: string): [number, number, number] {
-  const clean = hex.replace('#', '').slice(0, 6);
-  if (clean.length < 6) return [263, 76, 58];
-  const r = parseInt(clean.slice(0, 2), 16) / 255;
-  const g = parseInt(clean.slice(2, 4), 16) / 255;
-  const b = parseInt(clean.slice(4, 6), 16) / 255;
-  const max = Math.max(r, g, b);
-  const min = Math.min(r, g, b);
-  const l = (max + min) / 2;
-  if (max === min) return [0, 0, Math.round(l * 100)];
-  const d = max - min;
-  const s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
-  let h = 0;
-  if (max === r) h = ((g - b) / d + (g < b ? 6 : 0)) / 6;
-  else if (max === g) h = ((b - r) / d + 2) / 6;
-  else h = ((r - g) / d + 4) / 6;
-  return [Math.round(h * 360), Math.round(s * 100), Math.round(l * 100)];
+function selectPalette(id: string): void {
+  config.applyPalette(id);
 }
-
-function hslToHex(h: number, s: number, l: number): string {
-  const sl = s / 100;
-  const ll = l / 100;
-  const a = sl * Math.min(ll, 1 - ll);
-  const f = (n: number): string => {
-    const k = (n + h / 30) % 12;
-    const c = ll - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
-    return Math.round(255 * c)
-      .toString(16)
-      .padStart(2, '0');
-  };
-  return `#${f(0)}${f(8)}${f(4)}`;
-}
-
-function hslToRgba(h: number, s: number, l: number, alpha: number): string {
-  const sl = s / 100;
-  const ll = l / 100;
-  const a = sl * Math.min(ll, 1 - ll);
-  const f = (n: number): number => {
-    const k = (n + h / 30) % 12;
-    return Math.round(255 * (ll - a * Math.max(Math.min(k - 3, 9 - k, 1), -1)));
-  };
-  return `rgba(${f(0)},${f(8)},${f(4)},${alpha})`;
-}
-
-function applyDynamicColors(): void {
-  const accentHex = theme.value.colors.accent;
-  if (!/^#[0-9a-fA-F]{6}/.test(accentHex)) return;
-  const [h, s, l] = hexToHsl(accentHex);
-  const sat = Math.max(s, 55);
-  const lit = Math.min(Math.max(l, 45), 62);
-  const c = theme.value.colors;
-  c.accentLight = hslToHex(h, Math.max(sat - 5, 50), Math.min(lit + 22, 83));
-  c.border = hslToRgba(h, Math.max(sat * 0.65, 38), 65, 0.18);
-  c.ink1 = hslToHex(h, 14, 93);
-  c.ink2 = hslToHex(h, 18, 63);
-  c.ink3 = hslToHex(h, 20, 42);
-  c.nick = hslToHex((h + 45) % 360, 90, 78);
-  c.good = '#34d399';
-  c.bad = '#f87171';
-  RANK_KEYS.forEach((key, i) => {
-    const rh = (h + Math.round((i * 360) / RANK_KEYS.length)) % 360;
-    (c as any)[key] = hslToHex(rh, 80, 62);
-  });
-}
-
-watch(
-  [() => theme.value.dynamicColors, () => theme.value.colors.accent],
-  ([isDynamic]) => {
-    if (isDynamic) applyDynamicColors();
-  },
-  { immediate: true },
-);
 
 function toggleDynamic(): void {
   theme.value.dynamicColors = !theme.value.dynamicColors;
@@ -198,6 +139,7 @@ const ColorRow = defineComponent({
   props: {
     label: { type: String, required: true },
     value: { type: String, required: true },
+    sourceMode: { type: Boolean, default: false },
   },
   emits: ['update'],
   setup(props, { emit }) {
@@ -208,28 +150,49 @@ const ColorRow = defineComponent({
     };
     return () =>
       h('div', { class: 'flex items-center gap-3 px-3 py-2 no-drag' }, [
-        h('label', { style: 'position:relative;cursor:pointer;flex-shrink:0' }, [
-          h('div', {
-            style: `width:20px;height:20px;border-radius:50%;background:${displayColor()};border:1.5px solid rgba(255,255,255,0.18);box-shadow:0 0 6px ${displayColor()}44`,
-          }),
-          h('input', {
-            type: 'color',
-            value: displayColor(),
-            style: 'position:absolute;opacity:0;width:0;height:0;pointer-events:none',
-            onInput: (e: Event) => emit('update', (e.target as HTMLInputElement).value),
-          }),
-        ]),
+        h(
+          'label',
+          {
+            style: `position:relative;flex-shrink:0;${props.sourceMode ? 'cursor:default;pointer-events:none' : 'cursor:pointer'}`,
+          },
+          [
+            h('div', {
+              style: `width:20px;height:20px;border-radius:50%;background:${displayColor()};border:1.5px solid rgba(255,255,255,0.18);box-shadow:0 0 6px ${displayColor()}44`,
+            }),
+            props.sourceMode
+              ? null
+              : h('input', {
+                  type: 'color',
+                  value: displayColor(),
+                  style:
+                    'position:absolute;opacity:0;width:0;height:0;pointer-events:none',
+                  onInput: (e: Event) =>
+                    emit('update', (e.target as HTMLInputElement).value),
+                }),
+          ],
+        ),
         h(
           'span',
           { class: 'text-xs flex-1', style: 'color:var(--color-ink-2)' },
           props.label,
         ),
-        h('input', {
-          value: props.value,
-          class: 'input-field font-mono no-drag',
-          style: 'height:22px;width:80px;font-size:0.7rem;padding:0 6px;text-align:right',
-          onChange: (e: Event) => emit('update', (e.target as HTMLInputElement).value),
-        }),
+        props.sourceMode
+          ? h(
+              'span',
+              {
+                style:
+                  'font-size:0.58rem;font-weight:700;letter-spacing:0.1em;color:var(--color-accent-light);opacity:0.7',
+              },
+              'SOURCE',
+            )
+          : h('input', {
+              value: props.value,
+              class: 'input-field font-mono no-drag',
+              style:
+                'height:22px;width:80px;font-size:0.7rem;padding:0 6px;text-align:right',
+              onChange: (e: Event) =>
+                emit('update', (e.target as HTMLInputElement).value),
+            }),
       ]);
   },
 });
@@ -302,6 +265,45 @@ const bgImageOpacityModel = opacitySliderModel('bgImageOpacity');
     </aside>
 
     <div class="themed-scroll flex flex-1 flex-col gap-3 overflow-y-auto p-3">
+      <template v-if="activeTab === 'palette'">
+        <div class="palette-grid">
+          <button
+            v-for="palette in palettes"
+            :key="palette.id"
+            class="palette-card no-drag"
+            :class="{ 'palette-card--active': config.paletteId === palette.id }"
+            @click="selectPalette(palette.id)"
+          >
+            <div class="palette-preview">
+              <div
+                v-for="swatch in palette.swatches"
+                :key="swatch"
+                class="palette-swatch"
+                :style="{ background: swatch }"
+              />
+            </div>
+            <div class="palette-meta">
+              <span class="palette-name">{{ palette.name }}</span>
+              <span
+                v-if="config.paletteId === palette.id"
+                class="palette-active-pip"
+              />
+            </div>
+          </button>
+        </div>
+
+        <p
+          style="
+            font-size: 0.69rem;
+            color: var(--color-ink-3);
+            text-align: center;
+            padding-top: 4px;
+          "
+        >
+          Selecting a palette resets background and all colors.
+        </p>
+      </template>
+
       <template v-if="activeTab === 'background'">
         <div class="flex gap-1.5">
           <button
@@ -310,7 +312,7 @@ const bgImageOpacityModel = opacitySliderModel('bgImageOpacity');
             class="no-drag flex flex-1 items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-semibold transition-all"
             :style="
               theme.bgType === t.id
-                ? 'background:rgba(124,58,237,0.2);color:#b89aff;border:1px solid rgba(124,58,237,0.45);box-shadow:0 0 10px rgba(124,58,237,0.18)'
+                ? 'background:rgba(var(--color-accent-rgb), 0.2);color:var(--color-accent-light);border:1px solid rgba(var(--color-accent-rgb), 0.45);box-shadow:0 0 10px rgba(var(--color-accent-rgb), 0.18)'
                 : 'background:var(--color-surface-1);color:var(--color-ink-3);border:1px solid var(--color-border)'
             "
             @click="theme.bgType = t.id as any"
@@ -371,8 +373,8 @@ const bgImageOpacityModel = opacitySliderModel('bgImageOpacity');
                   <SliderRange class="bg-accent absolute h-full rounded-full" />
                 </SliderTrack>
                 <SliderThumb
-                  class="bg-accent-light block h-3 w-3 cursor-pointer rounded-full border-2 border-[rgba(124,58,237,0.6)] focus:outline-none"
-                  style="box-shadow: 0 0 6px rgba(124, 58, 237, 0.4)"
+                  class="bg-accent-light border-[rgba(var(--color-accent-rgb), 0.6)] block h-3 w-3 cursor-pointer rounded-full border-2 focus:outline-none"
+                  style="box-shadow: 0 0 6px rgba(var(--color-accent-rgb), 0.4)"
                 />
               </SliderRoot>
             </div>
@@ -399,7 +401,7 @@ const bgImageOpacityModel = opacitySliderModel('bgImageOpacity');
                 class="h-7 w-8 rounded text-sm transition-all"
                 :style="
                   theme.bgGradientDir === d.value
-                    ? 'background:rgba(124,58,237,0.25);color:#b89aff;border:1px solid rgba(124,58,237,0.5)'
+                    ? 'background:rgba(var(--color-accent-rgb), 0.25);color:var(--color-accent-light);border:1px solid rgba(var(--color-accent-rgb), 0.5)'
                     : 'background:var(--color-surface-1);color:var(--color-ink-3);border:1px solid var(--color-border)'
                 "
                 @click="theme.bgGradientDir = d.value"
@@ -444,7 +446,7 @@ const bgImageOpacityModel = opacitySliderModel('bgImageOpacity');
                   <SliderRange class="bg-accent absolute h-full rounded-full" />
                 </SliderTrack>
                 <SliderThumb
-                  class="bg-accent-light block h-3 w-3 cursor-pointer rounded-full border-2 border-[rgba(124,58,237,0.6)] focus:outline-none"
+                  class="bg-accent-light border-[rgba(var(--color-accent-rgb), 0.6)] block h-3 w-3 cursor-pointer rounded-full border-2 focus:outline-none"
                 />
               </SliderRoot>
               <span
@@ -464,8 +466,8 @@ const bgImageOpacityModel = opacitySliderModel('bgImageOpacity');
               <button
                 class="text-accent-light rounded-md px-3 py-1 text-xs transition-colors"
                 style="
-                  background: rgba(124, 58, 237, 0.1);
-                  border: 1px solid rgba(124, 58, 237, 0.22);
+                  background: rgba(var(--color-accent-rgb), 0.1);
+                  border: 1px solid rgba(var(--color-accent-rgb), 0.22);
                 "
                 @click="addStop"
               >
@@ -492,8 +494,8 @@ const bgImageOpacityModel = opacitySliderModel('bgImageOpacity');
                 <SliderRange class="bg-accent absolute h-full rounded-full" />
               </SliderTrack>
               <SliderThumb
-                class="bg-accent-light block h-3 w-3 cursor-pointer rounded-full border-2 border-[rgba(124,58,237,0.6)] focus:outline-none"
-                style="box-shadow: 0 0 6px rgba(124, 58, 237, 0.4)"
+                class="bg-accent-light border-[rgba(var(--color-accent-rgb), 0.6)] block h-3 w-3 cursor-pointer rounded-full border-2 focus:outline-none"
+                style="box-shadow: 0 0 6px rgba(var(--color-accent-rgb), 0.4)"
               />
             </SliderRoot>
           </div>
@@ -509,8 +511,8 @@ const bgImageOpacityModel = opacitySliderModel('bgImageOpacity');
                 <button
                   class="text-accent-light flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-xs transition-all"
                   style="
-                    background: rgba(124, 58, 237, 0.12);
-                    border: 1px solid rgba(124, 58, 237, 0.28);
+                    background: rgba(var(--color-accent-rgb), 0.12);
+                    border: 1px solid rgba(var(--color-accent-rgb), 0.28);
                   "
                   @click="pickLocalImage"
                 >
@@ -560,7 +562,7 @@ const bgImageOpacityModel = opacitySliderModel('bgImageOpacity');
                   <SliderRange class="bg-accent absolute h-full rounded-full" />
                 </SliderTrack>
                 <SliderThumb
-                  class="bg-accent-light block h-3 w-3 cursor-pointer rounded-full border-2 border-[rgba(124,58,237,0.6)] focus:outline-none"
+                  class="bg-accent-light border-[rgba(var(--color-accent-rgb), 0.6)] block h-3 w-3 cursor-pointer rounded-full border-2 focus:outline-none"
                 />
               </SliderRoot>
             </div>
@@ -583,7 +585,7 @@ const bgImageOpacityModel = opacitySliderModel('bgImageOpacity');
                   <SliderRange class="bg-accent absolute h-full rounded-full" />
                 </SliderTrack>
                 <SliderThumb
-                  class="bg-accent-light block h-3 w-3 cursor-pointer rounded-full border-2 border-[rgba(124,58,237,0.6)] focus:outline-none"
+                  class="bg-accent-light border-[rgba(var(--color-accent-rgb), 0.6)] block h-3 w-3 cursor-pointer rounded-full border-2 focus:outline-none"
                 />
               </SliderRoot>
             </div>
@@ -620,8 +622,8 @@ const bgImageOpacityModel = opacitySliderModel('bgImageOpacity');
               <div
                 class="h-8 w-8 shrink-0 rounded-md"
                 style="
-                  background: rgba(124, 58, 237, 0.25);
-                  border: 1px solid rgba(124, 58, 237, 0.35);
+                  background: rgba(var(--color-accent-rgb), 0.25);
+                  border: 1px solid rgba(var(--color-accent-rgb), 0.35);
                 "
               />
               <div class="flex min-w-0 flex-1 flex-col gap-1">
@@ -643,7 +645,7 @@ const bgImageOpacityModel = opacitySliderModel('bgImageOpacity');
           class="no-drag flex items-center justify-between rounded-lg px-3 py-3 transition-all"
           :style="
             theme.dynamicColors
-              ? 'background:rgba(124,58,237,0.1);border:1px solid rgba(124,58,237,0.32);box-shadow:0 0 14px rgba(124,58,237,0.08)'
+              ? 'background:rgba(var(--color-accent-rgb), 0.1);border:1px solid rgba(var(--color-accent-rgb), 0.32);box-shadow:0 0 14px rgba(var(--color-accent-rgb), 0.08)'
               : 'background:var(--color-surface-1);border:1px solid var(--color-border)'
           "
         >
@@ -652,7 +654,7 @@ const bgImageOpacityModel = opacitySliderModel('bgImageOpacity');
               class="flex h-7 w-7 shrink-0 items-center justify-center rounded-md transition-all"
               :style="
                 theme.dynamicColors
-                  ? 'background:rgba(124,58,237,0.28);color:var(--color-accent-light)'
+                  ? 'background:rgba(var(--color-accent-rgb), 0.28);color:var(--color-accent-light)'
                   : 'background:var(--color-surface-2);color:var(--color-ink-3)'
               "
             >
@@ -698,28 +700,12 @@ const bgImageOpacityModel = opacitySliderModel('bgImageOpacity');
           </div>
 
           <div class="card mb-1.5">
-            <div class="relative">
-              <ColorRow
-                label="Accent"
-                :value="theme.colors.accent"
-                @update="theme.colors.accent = $event"
-              />
-              <div
-                v-if="theme.dynamicColors"
-                class="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2"
-              >
-                <span
-                  style="
-                    font-size: 0.58rem;
-                    font-weight: 700;
-                    letter-spacing: 0.1em;
-                    color: var(--color-accent-light);
-                    opacity: 0.7;
-                  "
-                  >SOURCE</span
-                >
-              </div>
-            </div>
+            <ColorRow
+              label="Accent"
+              :value="theme.colors.accent"
+              :source-mode="theme.dynamicColors"
+              @update="theme.colors.accent = $event"
+            />
           </div>
 
           <div
@@ -760,3 +746,76 @@ const bgImageOpacityModel = opacitySliderModel('bgImageOpacity');
     </div>
   </div>
 </template>
+
+<style scoped>
+.palette-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+.palette-card {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 9px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  cursor: pointer;
+  transition:
+    border-color 150ms ease,
+    background 150ms ease,
+    box-shadow 150ms ease;
+  text-align: left;
+}
+
+.palette-card:hover {
+  border-color: rgba(var(--color-accent-rgb), 0.28);
+  background: rgba(var(--color-accent-rgb), 0.04);
+}
+
+.palette-card--active {
+  border-color: rgba(var(--color-accent-rgb), 0.5);
+  background: rgba(var(--color-accent-rgb), 0.09);
+  box-shadow: 0 0 14px rgba(var(--color-accent-rgb), 0.12);
+}
+
+.palette-preview {
+  display: flex;
+  height: 28px;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.palette-swatch {
+  flex: 1;
+}
+
+.palette-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.palette-name {
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: var(--color-ink-2);
+}
+
+.palette-card--active .palette-name {
+  color: var(--color-accent-light);
+}
+
+.palette-active-pip {
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  border-radius: 9999px;
+  background: var(--color-accent);
+  box-shadow: 0 0 5px rgba(var(--color-accent-rgb), 0.7);
+  flex-shrink: 0;
+}
+</style>

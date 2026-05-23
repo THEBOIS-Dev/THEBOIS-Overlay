@@ -5,56 +5,56 @@ import { _electron as electron } from 'playwright';
 
 const PIKA_PLAYERS = [
   'voodootje0',
-  'JustThiemo',
-  'Arrly',
-  '_Luanne',
-  'Ehtne',
-  'Darnly',
-  'Vaitren',
-  'tobin',
-  'loxamy',
-  'meoweys',
-  'resuns',
-  'izoo_',
-  'Si1ent_',
-  'Hiqhest',
-  'IStayKittens',
+'JustThiemo',
+'Arrly',
+'_Luanne',
+'Ehtne',
+'Darnly',
+'Vaitren',
+'tobin',
+'loxamy',
+'meoweys',
+'resuns',
+'izoo_',
+'Si1ent_',
+'Hiqhest',
+'IStayKittens',
 ];
 
 const JARTEX_PLAYERS = [
   'Si1ent_',
-  'Sandy07',
-  'DARKpeveresh',
-  'meelb',
-  'Lexi58',
-  'Faoloe',
-  'Weeder',
-  'Djim',
-  'Stxrs',
-  'bene_e',
-  'JustThiemo',
-  'iFlyYT',
-  'voodootje0',
-  'climbby',
-  'IStayKittens',
+'Sandy07',
+'DARKpeveresh',
+'meelb',
+'Lexi58',
+'Faoloe',
+'Weeder',
+'Djim',
+'Stxrs',
+'bene_e',
+'JustThiemo',
+'iFlyYT',
+'voodootje0',
+'climbby',
+'IStayKittens',
 ];
 
 const ALL_COLUMNS = [
   'NAME',
-  'LEVEL',
-  'FKDR',
-  'WLR',
-  'WINS',
-  'LOSSES',
-  'FINAL_KILLS',
-  'FINAL_DEATHS',
-  'KILLS',
-  'DEATHS',
-  'KDR',
-  'BEDS_BROKEN',
-  'BBLR',
-  'WIN_STREAK',
-  'PLAYED',
+'LEVEL',
+'FKDR',
+'WLR',
+'WINS',
+'LOSSES',
+'FINAL_KILLS',
+'FINAL_DEATHS',
+'KILLS',
+'DEATHS',
+'KDR',
+'BEDS_BROKEN',
+'BBLR',
+'WIN_STREAK',
+'PLAYED',
 ];
 
 const BASE_CONFIG_SEED = {
@@ -146,6 +146,7 @@ async function captureShowcase(
         localStorage.setItem('thebois-config', JSON.stringify(cfg));
         localStorage.setItem('nicks', JSON.stringify(nicks));
         localStorage.setItem('skip-loading', '1');
+        localStorage.setItem('skip-announcements', '1');
       },
       { cfg: configSeed, nicks: NICKS_SEED },
     );
@@ -289,13 +290,13 @@ async function captureShowcase(
 
     await page.screenshot({
       path: path.join(outDir, outputFilename),
-      fullPage: false,
-      clip: {
-        x: 0,
-        y: 0,
-        width: contentW,
-        height: contentH,
-      },
+                          fullPage: false,
+                          clip: {
+                            x: 0,
+                            y: 0,
+                            width: contentW,
+                            height: contentH,
+                          },
     });
   } finally {
     await app.close();
