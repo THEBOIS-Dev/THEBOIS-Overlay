@@ -3,7 +3,7 @@ name: Showcase Screenshot
 on:
   workflow_dispatch:
   push:
-    branches: [main, master]
+    branches: [main, master, dev]
     paths-ignore:
       - 'assets/showcase-pika.png'
       - 'assets/showcase-jartex.png'
