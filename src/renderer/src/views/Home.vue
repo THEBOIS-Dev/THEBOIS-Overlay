@@ -27,6 +27,8 @@ import {
 const players = usePlayersStore();
 const config = useConfigStore();
 
+const SHOWCASE_MODE = localStorage.getItem('skip-remove-btn') === '1';
+
 const headerBackdrop = computed(() => (config.lowEndMode ? 'none' : 'blur(8px)'));
 
 const activeColumns = computed(() => config.activeColumns);
@@ -455,6 +457,7 @@ const headerBackground = computed(() => {
                 </div>
               </th>
               <th
+                v-if="!SHOWCASE_MODE"
                 class="w-6 border-b"
                 style="border-color: rgba(var(--color-accent-rgb), 0.1)"
               />
@@ -681,6 +684,7 @@ const headerBackground = computed(() => {
                 </div>
               </th>
               <th
+                v-if="!SHOWCASE_MODE"
                 class="w-6 border-b"
                 style="border-color: rgba(var(--color-accent-rgb), 0.1)"
               />

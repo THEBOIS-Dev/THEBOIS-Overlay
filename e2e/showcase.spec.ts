@@ -12,7 +12,7 @@ const PIKA_PLAYERS = [
 'Darnly',
 'Vaitren',
 'tobin',
-'Climbby',
+'loxamy',
 'meoweys',
 'resuns',
 'izoo_',
@@ -145,6 +145,7 @@ async function captureShowcase(
     await page.evaluate(
       ({ cfg, nicks }) => {
         localStorage.setItem('thebois-config', JSON.stringify(cfg));
+        localStorage.setItem('thebois-config-version', '4');
         localStorage.setItem('nicks', JSON.stringify(nicks));
         localStorage.setItem('skip-loading', '1');
         localStorage.setItem('skip-announcements', '1');
@@ -286,6 +287,13 @@ async function captureShowcase(
     );
 
     await page.waitForTimeout(400);
+
+    await page.addStyleTag({
+      content: `
+      ::-webkit-scrollbar { display: none !important; width: 0 !important; height: 0 !important; }
+      * { scrollbar-width: none !important; }
+      `,
+    });
 
     const outDir = path.join(__dirname, '..', 'assets');
     fs.mkdirSync(outDir, { recursive: true });
