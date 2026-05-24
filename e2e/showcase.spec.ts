@@ -15,6 +15,7 @@ const PIKA_PLAYERS = [
 'Climbby',
 'meoweys',
 'resuns',
+'izoo_',
 'Si1ent_',
 'Hiqhest',
 'IStayKittens',
@@ -268,7 +269,10 @@ async function captureShowcase(
         const tbodyH = tbody?.scrollHeight ?? 0;
         const footerH = footer?.offsetHeight ?? 34;
 
-        const w = document.body.scrollWidth;
+        // Measure the table's natural content width (sum of whitespace-nowrap columns)
+        // rather than body.scrollWidth which includes the over-expanded 2000px window.
+        const table = document.querySelector('table') as HTMLElement | null;
+        const w = table?.scrollWidth ?? document.body.scrollWidth;
 
         return {
           contentW: w,
