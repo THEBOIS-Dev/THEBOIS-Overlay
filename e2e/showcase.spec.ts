@@ -5,56 +5,55 @@ import { _electron as electron } from 'playwright';
 
 const PIKA_PLAYERS = [
   'voodootje0',
-  'JustThiemo',
-  'Arrly',
-  '_Luanne',
-  'Ehtne',
-  'Darnly',
-  'Vaitren',
-  'tobin',
-  'loxamy',
-  'meoweys',
-  'resuns',
-  'izoo_',
-  'Si1ent_',
-  'Hiqhest',
-  'IStayKittens',
+'Arrly',
+'JustThiemo',
+'_Luanne',
+'Ehtne',
+'Darnly',
+'Vaitren',
+'tobin',
+'Climbby',
+'meoweys',
+'resuns',
+'izoo_',
+'Si1ent_',
+'Hiqhest',
+'IStayKittens',
 ];
 
 const JARTEX_PLAYERS = [
-  'Si1ent_',
-  'Sandy07',
-  'DARKpeveresh',
-  'meelb',
-  'Lexi58',
-  'Faoloe',
-  'Weeder',
-  'Djim',
-  'Stxrs',
-  'bene_e',
-  'JustThiemo',
-  'iFlyYT',
   'voodootje0',
-  'climbby',
-  'IStayKittens',
+'iFlyYT',
+'JustThiemo',
+'bene_e',
+'Stxrs',
+'Djim',
+'Faoloe',
+'Climbby',
+'Lexi58',
+'Meelb',
+'DARKpeveresh',
+'Sandy07',
+'Si1ent_',
+'IStayKittens',
 ];
 
 const ALL_COLUMNS = [
   'NAME',
-  'LEVEL',
-  'FKDR',
-  'WLR',
-  'WINS',
-  'LOSSES',
-  'FINAL_KILLS',
-  'FINAL_DEATHS',
-  'KILLS',
-  'DEATHS',
-  'KDR',
-  'BEDS_BROKEN',
-  'BBLR',
-  'WIN_STREAK',
-  'PLAYED',
+'LEVEL',
+'FKDR',
+'WLR',
+'WINS',
+'LOSSES',
+'FINAL_KILLS',
+'FINAL_DEATHS',
+'KILLS',
+'DEATHS',
+'KDR',
+'BEDS_BROKEN',
+'BBLR',
+'WIN_STREAK',
+'PLAYED',
 ];
 
 const BASE_CONFIG_SEED = {
@@ -74,24 +73,26 @@ const BASE_CONFIG_SEED = {
   jartexProxyPort: 25567,
   proxyBindHost: '127.0.0.1',
   proxyBannerDismissed: true,
+  paletteId: 'ember',
   theme: {
     bgType: 'solid',
-    bgColor: '#06091400',
+    bgColor: '#130508',
     bgGradientStops: [
-      { color: '#7c3aed', position: 0 },
-      { color: '#06091a', position: 100 },
+      { color: '#ff2d55', position: 0 },
+      { color: '#130508', position: 100 },
     ],
     bgGradientDir: 'to bottom right',
     bgImageUrl: '',
     bgImageOpacity: 0.3,
     opacity: 1,
+    dynamicColors: false,
     colors: {
-      accent: '#7c3aed',
-      accentLight: '#b89aff',
-      border: 'rgba(120,80,255,0.18)',
-      ink1: '#e8e0ff',
-      ink2: '#a89bc2',
-      ink3: '#6b5e82',
+      accent: '#ff2d55',
+      accentLight: '#ff5c7c',
+      border: '#3a1523',
+      ink1: '#ffe9ef',
+      ink2: '#ff4d73',
+      ink3: '#b87586',
       nick: '#fde68a',
       good: '#34d399',
       bad: '#f87171',
@@ -144,8 +145,11 @@ async function captureShowcase(
     await page.evaluate(
       ({ cfg, nicks }) => {
         localStorage.setItem('thebois-config', JSON.stringify(cfg));
+        localStorage.setItem('thebois-config-version', '4');
         localStorage.setItem('nicks', JSON.stringify(nicks));
         localStorage.setItem('skip-loading', '1');
+        localStorage.setItem('skip-announcements', '1');
+        localStorage.setItem('skip-remove-btn', '1');
       },
       { cfg: configSeed, nicks: NICKS_SEED },
     );
@@ -265,7 +269,10 @@ async function captureShowcase(
         const tbodyH = tbody?.scrollHeight ?? 0;
         const footerH = footer?.offsetHeight ?? 34;
 
-        const w = document.body.scrollWidth;
+        // Measure the table's natural content width (sum of whitespace-nowrap columns)
+        // rather than body.scrollWidth which includes the over-expanded 2000px window.
+        const table = document.querySelector('table') as HTMLElement | null;
+        const w = table?.scrollWidth ?? document.body.scrollWidth;
 
         return {
           contentW: w,
@@ -284,18 +291,25 @@ async function captureShowcase(
 
     await page.waitForTimeout(400);
 
+    await page.addStyleTag({
+      content: `
+      ::-webkit-scrollbar { display: none !important; width: 0 !important; height: 0 !important; }
+      * { scrollbar-width: none !important; }
+      `,
+    });
+
     const outDir = path.join(__dirname, '..', 'assets');
     fs.mkdirSync(outDir, { recursive: true });
 
     await page.screenshot({
       path: path.join(outDir, outputFilename),
-      fullPage: false,
-      clip: {
-        x: 0,
-        y: 0,
-        width: contentW,
-        height: contentH,
-      },
+                          fullPage: false,
+                          clip: {
+                            x: 0,
+                            y: 0,
+                            width: contentW,
+                            height: contentH,
+                          },
     });
   } finally {
     await app.close();

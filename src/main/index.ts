@@ -26,6 +26,13 @@ if (process.platform === 'darwin') {
   app.commandLine.appendSwitch('enable-zero-copy');
 }
 
+if (process.platform === 'win32') {
+  app.commandLine.appendSwitch('ignore-gpu-blocklist');
+  app.commandLine.appendSwitch('enable-gpu-rasterization');
+  app.commandLine.appendSwitch('enable-zero-copy');
+  app.commandLine.appendSwitch('disable-gpu-driver-bug-workarounds');
+}
+
 app.commandLine.appendSwitch(
   'enable-hardware-overlays',
   'single-fullscreen,single-on-top',
@@ -238,6 +245,7 @@ async function apiGet<T = unknown>(url: string) {
 
 let win: BrowserWindow | null = null;
 let proxyManager: ProxyManager | null = null;
+let linuxAllowMinimize = false;
 
 function createWindow(): void {
   const state = windowStateKeeper({ defaultWidth: 700, defaultHeight: 460 });
@@ -268,6 +276,15 @@ function createWindow(): void {
 
   state.manage(win);
   win.setAlwaysOnTop(true, 'screen-saver');
+
+  if (process.platform === 'linux') {
+    win.on('minimize', () => {
+      if (!linuxAllowMinimize) {
+        setImmediate(() => win?.showInactive());
+      }
+      linuxAllowMinimize = false;
+    });
+  }
 
   if (process.platform === 'darwin') {
     win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
@@ -318,11 +335,17 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
 });
 
-ipcMain.on('win:minimize', () => win?.minimize());
+ipcMain.on('win:minimize', () => {
+  if (process.platform === 'linux') linuxAllowMinimize = true;
+  win?.minimize();
+});
 ipcMain.on('win:close', () => win?.close());
 ipcMain.on('win:toggle-minimize', () => {
   if (win?.isMinimized()) win?.showInactive();
-  else win?.minimize();
+  else {
+    if (process.platform === 'linux') linuxAllowMinimize = true;
+    win?.minimize();
+  }
 });
 ipcMain.on('win:open-external', (_, url: string) => void shell.openExternal(url));
 
@@ -465,7 +488,7 @@ function makeFetchHandler(network: 'pika' | 'jartex', base: string) {
           rateLimit: false,
           statsDisabled,
         };
-        cache.set(key, result);
+        if (!notFound) cache.set(key, result);
         return result;
       }
 
@@ -479,15 +502,13 @@ function makeFetchHandler(network: 'pika' | 'jartex', base: string) {
 
       if (notFound) {
         dbg.ipc(`${network}:fetch "${username}" → NOT FOUND`);
-        const result: FetchResult = {
+        return {
           profile: null,
           stats: null,
           notFound: true,
           rateLimit: false,
           statsDisabled: false,
         };
-        cache.set(key, result);
-        return result;
       }
 
       if (rateLimit) {

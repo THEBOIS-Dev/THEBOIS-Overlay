@@ -3,7 +3,7 @@ name: Showcase Screenshot
 on:
   workflow_dispatch:
   push:
-    branches: [main, master]
+    branches: [main, master, dev]
     paths-ignore:
       - 'assets/showcase-pika.png'
       - 'assets/showcase-jartex.png'
@@ -64,12 +64,14 @@ jobs:
       - name: Commit screenshots to repo
         run: |
           mkdir -p assets
-          git config user.name  "github-actions[bot]"
+
+          git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
           git add assets/showcase-pika.png assets/showcase-jartex.png
+
           git diff --staged --quiet && exit 0
+
           git commit -m "chore: update showcase screenshots [skip ci]"
-          git stash
-          git pull --rebase origin HEAD
-          git stash pop
-          git push
+
+          git push origin HEAD:${GITHUB_REF_NAME}

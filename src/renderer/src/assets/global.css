@@ -8,26 +8,28 @@
   --font-mc: 'Minecraft', 'Courier New', monospace;
   --font-vt: 'Russo One', sans-serif;
 
-  --color-bg: #04060f;
+  --color-bg: #0b0704;
+  --color-bg-rgb: 11, 7, 4;
 
   --color-surface-0: rgba(255, 255, 255, 0.02);
   --color-surface-1: rgba(255, 255, 255, 0.035);
   --color-surface-2: rgba(255, 255, 255, 0.065);
   --color-surface-3: rgba(255, 255, 255, 0.1);
 
-  --color-border: rgba(120, 80, 255, 0.16);
-  --color-border-hover: rgba(160, 120, 255, 0.32);
-  --color-border-active: rgba(180, 140, 255, 0.5);
+  --color-border: rgba(249, 115, 22, 0.16);
+  --color-border-hover: rgba(249, 115, 22, 0.32);
+  --color-border-active: rgba(249, 115, 22, 0.5);
 
-  --color-accent: #7c3aed;
-  --color-accent-dim: rgba(124, 58, 237, 0.12);
-  --color-accent-glow: rgba(124, 58, 237, 0.45);
-  --color-accent-light: #b89aff;
-  --color-accent-2: #e040fb;
+  --color-accent: #f97316;
+  --color-accent-rgb: 249, 115, 22;
+  --color-accent-dim: rgba(249, 115, 22, 0.12);
+  --color-accent-glow: rgba(249, 115, 22, 0.45);
+  --color-accent-light: #fdba74;
+  --color-accent-2: #fb923c;
 
-  --color-ink-1: #ede9ff;
-  --color-ink-2: #9d93c4;
-  --color-ink-3: #4a4270;
+  --color-ink-1: #fff3e8;
+  --color-ink-2: #b08060;
+  --color-ink-3: #6b4a2c;
 
   --color-good: #34d399;
   --color-warn: #fbbf24;
@@ -54,7 +56,7 @@
   --radius-lg: 14px;
   --radius-xl: 18px;
 
-  --shadow-glow: 0 0 18px rgba(124, 58, 237, 0.25);
+  --shadow-glow: 0 0 18px rgba(249, 115, 22, 0.25);
   --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.03);
 }
 
@@ -79,7 +81,7 @@ body,
   -webkit-font-smoothing: antialiased;
   user-select: none;
   scrollbar-width: thin;
-  scrollbar-color: rgba(124, 58, 237, 0.22) transparent;
+  scrollbar-color: rgba(var(--color-accent-rgb), 0.22) transparent;
 }
 
 input[type='number']::-webkit-inner-spin-button,
@@ -103,12 +105,12 @@ input[type='number'] {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(124, 58, 237, 0.22);
+  background: rgba(var(--color-accent-rgb), 0.22);
   border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(124, 58, 237, 0.45);
+  background: rgba(var(--color-accent-rgb), 0.45);
 }
 
 ::-webkit-scrollbar-corner {
@@ -117,7 +119,7 @@ input[type='number'] {
 
 .themed-scroll {
   scrollbar-width: thin;
-  scrollbar-color: rgba(124, 58, 237, 0.22) transparent;
+  scrollbar-color: rgba(var(--color-accent-rgb), 0.22) transparent;
 }
 
 .themed-scroll::-webkit-scrollbar {
@@ -130,12 +132,12 @@ input[type='number'] {
 }
 
 .themed-scroll::-webkit-scrollbar-thumb {
-  background: rgba(124, 58, 237, 0.22);
+  background: rgba(var(--color-accent-rgb), 0.22);
   border-radius: 9999px;
 }
 
 .themed-scroll::-webkit-scrollbar-thumb:hover {
-  background: rgba(124, 58, 237, 0.45);
+  background: rgba(var(--color-accent-rgb), 0.45);
 }
 
 .themed-scroll::-webkit-scrollbar-corner {
@@ -160,7 +162,7 @@ input[type='number'] {
 .glass-row:hover {
   background: linear-gradient(
     90deg,
-    rgba(124, 58, 237, 0.085) 0%,
+    rgba(var(--color-accent-rgb), 0.085) 0%,
     rgba(255, 255, 255, 0.018) 100%
   );
 }
@@ -195,7 +197,7 @@ input[type='number'] {
   border-radius: var(--radius-sm);
   cursor: pointer;
   font-weight: 600;
-  background: linear-gradient(140deg, #8049ef 0%, #6527d0 100%);
+  background: var(--color-accent);
   color: rgba(255, 255, 255, 0.96);
   letter-spacing: 0.01em;
   transition:
@@ -204,7 +206,7 @@ input[type='number'] {
     transform 140ms ease;
   box-shadow:
     0 1px 3px rgba(0, 0, 0, 0.4),
-    0 0 14px rgba(124, 58, 237, 0.22),
+    0 0 14px rgba(var(--color-accent-rgb), 0.22),
     inset 0 1px 0 rgba(255, 255, 255, 0.14);
 }
 
@@ -212,7 +214,7 @@ input[type='number'] {
   opacity: 0.9;
   box-shadow:
     0 2px 8px rgba(0, 0, 0, 0.45),
-    0 0 26px rgba(124, 58, 237, 0.4),
+    0 0 26px rgba(var(--color-accent-rgb), 0.4),
     inset 0 1px 0 rgba(255, 255, 255, 0.16);
   transform: translateY(-1px);
 }
@@ -245,9 +247,9 @@ input[type='number'] {
 }
 
 .input-field:focus {
-  border-color: rgba(124, 58, 237, 0.55);
-  background: rgba(124, 58, 237, 0.07);
-  box-shadow: 0 0 0 2.5px rgba(124, 58, 237, 0.16);
+  border-color: rgba(var(--color-accent-rgb), 0.55);
+  background: rgba(var(--color-accent-rgb), 0.07);
+  box-shadow: 0 0 0 2.5px rgba(var(--color-accent-rgb), 0.16);
 }
 
 .input-field::placeholder {
@@ -273,24 +275,27 @@ input[type='number'] {
 }
 
 .select-field:focus {
-  border-color: rgba(124, 58, 237, 0.55);
-  background-color: rgba(124, 58, 237, 0.07);
+  border-color: rgba(var(--color-accent-rgb), 0.55);
+  background-color: rgba(var(--color-accent-rgb), 0.07);
 }
 
 .select-field option {
-  background: #0d0a1e;
+  background: var(--color-bg);
   color: var(--color-ink-1);
 }
 
 .tag {
   display: inline-flex;
   align-items: center;
-  padding: 0.1rem 0.4rem;
+  justify-content: center;
+  padding: 0 0.4rem;
+  height: 1.35rem;
   border-radius: 4px;
   font-size: 0.68rem;
   font-weight: 700;
   letter-spacing: 0.06em;
   line-height: 1;
+  white-space: nowrap;
 }
 
 .card {
@@ -301,11 +306,15 @@ input[type='number'] {
 }
 
 .divide-subtle > * + * {
-  border-top: 1px solid rgba(120, 80, 255, 0.1);
+  border-top: 1px solid rgba(var(--color-accent-rgb), 0.1);
 }
 
 .gradient-text {
-  background: linear-gradient(130deg, #c4a8ff 0%, #e040fb 100%);
+  background: linear-gradient(
+    130deg,
+    var(--color-accent-light) 0%,
+    var(--color-accent) 100%
+  );
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -387,13 +396,13 @@ input[type='number'] {
   0%,
   100% {
     box-shadow:
-      0 0 12px rgba(124, 58, 237, 0.18),
-      inset 0 0 24px rgba(124, 58, 237, 0.03);
+      0 0 12px rgba(var(--color-accent-rgb), 0.18),
+      inset 0 0 24px rgba(var(--color-accent-rgb), 0.03);
   }
   50% {
     box-shadow:
-      0 0 20px rgba(124, 58, 237, 0.3),
-      inset 0 0 32px rgba(124, 58, 237, 0.07);
+      0 0 20px rgba(var(--color-accent-rgb), 0.3),
+      inset 0 0 32px rgba(var(--color-accent-rgb), 0.07);
   }
 }
 
@@ -434,7 +443,7 @@ input[type='number'] {
   background: linear-gradient(
     90deg,
     rgba(255, 255, 255, 0.03) 25%,
-    rgba(180, 130, 255, 0.09) 50%,
+    rgba(var(--color-accent-rgb), 0.09) 50%,
     rgba(255, 255, 255, 0.03) 75%
   );
   background-size: 200% 100%;
@@ -458,10 +467,10 @@ input[type='number'] {
 }
 
 .stat-0 {
-  color: #3d3560;
+  color: #3d2510;
 }
 .stat-1 {
-  color: #7b7498;
+  color: #9a6a40;
 }
 .stat-2 {
   color: #34d399;
@@ -495,8 +504,8 @@ input[type='number'] {
   height: 340px;
   background: radial-gradient(
     ellipse at 25% 25%,
-    rgba(124, 58, 237, 0.085) 0%,
-    rgba(124, 58, 237, 0.03) 40%,
+    rgba(var(--color-accent-rgb), 0.085) 0%,
+    rgba(var(--color-accent-rgb), 0.03) 40%,
     transparent 70%
   );
 }
@@ -508,8 +517,8 @@ input[type='number'] {
   height: 300px;
   background: radial-gradient(
     ellipse at 75% 75%,
-    rgba(45, 55, 180, 0.055) 0%,
-    rgba(56, 70, 200, 0.022) 45%,
+    rgba(var(--color-accent-rgb), 0.04) 0%,
+    rgba(var(--color-accent-rgb), 0.015) 45%,
     transparent 70%
   );
 }
@@ -526,7 +535,7 @@ input[type='number'] {
   inset: 0;
   background: radial-gradient(
     ellipse at 50% 0%,
-    rgba(90, 40, 200, 0.035) 0%,
+    rgba(var(--color-accent-rgb), 0.035) 0%,
     transparent 60%
   );
 }
@@ -534,7 +543,9 @@ input[type='number'] {
 .clan-badge {
   display: inline-flex;
   align-items: center;
-  padding: 2px 7px;
+  justify-content: center;
+  padding: 0 7px;
+  height: 1.35rem;
   border-radius: 5px;
   font-size: 0.68rem;
   font-weight: 800;
@@ -554,6 +565,7 @@ input[type='number'] {
 .clan-badge-text {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   line-height: 1;
   background: linear-gradient(135deg, #fde68a, #fbbf24, #f59e0b, #fcd34d);
   background-size: 100% 100%;
@@ -567,7 +579,9 @@ input[type='number'] {
 .private-badge {
   display: inline-flex;
   align-items: center;
-  padding: 2px 7px;
+  justify-content: center;
+  padding: 0 7px;
+  height: 1.25rem;
   border-radius: 4px;
   font-size: 0.62rem;
   font-weight: 800;
@@ -605,4 +619,120 @@ input[type='number'] {
       inset 0 1px 0 rgba(255, 120, 120, 0.11),
       inset 0 -1px 0 rgba(0, 0, 0, 0.4);
   }
+}
+
+.animate-glow-pulse,
+.animate-status-blink,
+.animate-pulse-dot,
+.animate-shimmer,
+.animate-spin {
+  animation-play-state: var(--anim-play-state, running);
+}
+
+html.low-end .player-row {
+  contain: layout style paint;
+  transition: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
+}
+
+html.low-end .player-row:hover {
+  background: rgba(255, 255, 255, 0.025) !important;
+  transform: none !important;
+}
+
+html.low-end .nicked-row,
+html.low-end .nicked-row:hover {
+  background: rgba(180, 0, 120, 0.12) !important;
+  box-shadow: none !important;
+  transform: none !important;
+}
+
+html.low-end .nicked-row::after {
+  display: none !important;
+}
+
+html.low-end .animate-shimmer {
+  animation: none !important;
+  background: rgba(255, 255, 255, 0.07) !important;
+}
+
+html.low-end .animate-glow-pulse,
+html.low-end .animate-status-blink,
+html.low-end .animate-pulse-dot,
+html.low-end .animate-spin,
+html.low-end .animate-row-in {
+  animation: none !important;
+}
+
+html.low-end .proxy-banner::before,
+html.low-end .team-header-row::before {
+  display: none !important;
+}
+
+html.low-end .team-pip,
+html.low-end .team-pip-glow {
+  animation: none !important;
+}
+
+html.low-end .team-pip-glow {
+  display: none !important;
+}
+
+html.low-end .btn-accent {
+  box-shadow: none !important;
+  transition: opacity 80ms linear !important;
+}
+
+html.low-end .glass-row {
+  transition: none !important;
+}
+
+html.low-end .glass-row:hover {
+  background: rgba(var(--color-accent-rgb), 0.06) !important;
+}
+
+html.low-end .rank-text,
+html.low-end .name-text,
+html.low-end .stat-text,
+html.low-end .clan-tag-wrapper {
+  text-shadow: none !important;
+}
+
+html.low-end .clan-icon {
+  -webkit-text-fill-color: #c084fc !important;
+  background-image: none !important;
+  filter: none !important;
+}
+
+html.low-end .nick-badge {
+  filter: none !important;
+}
+
+html.low-end .lock-icon-wrapper svg {
+  filter: none !important;
+}
+
+html.low-end .badge-staff {
+  box-shadow: none !important;
+}
+
+html.low-end .team-indicator {
+  box-shadow: none !important;
+}
+
+html.low-end thead {
+  background: var(--color-bg) !important;
+}
+
+html.low-end header,
+html.low-end .titlebar-backdrop,
+html.low-end .header-blur {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+html.low-end .proxy-banner {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
 }

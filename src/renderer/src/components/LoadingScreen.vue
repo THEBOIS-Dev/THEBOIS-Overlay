@@ -7,8 +7,10 @@ const config = useConfigStore();
 
 const fading = ref(false);
 const videoRef = ref<HTMLVideoElement | null>(null);
+const videoSrc = config.lowEndMode ? '/loading-lo.mp4' : '/loading.mp4';
 
 let safetyTimer: ReturnType<typeof setTimeout> | null = null;
+let rafId: number | null = null;
 
 function finish(): void {
   if (fading.value) return;
@@ -16,29 +18,54 @@ function finish(): void {
   setTimeout(() => emit('done'), 350);
 }
 
+function startPlayback(video: HTMLVideoElement): void {
+  video.play().catch(() => finish());
+}
+
 onMounted(() => {
   const video = videoRef.value;
   if (!video) {
-    finish();
+    safetyTimer = setTimeout(finish, 1800);
     return;
   }
+
   video.addEventListener('ended', finish, { once: true });
   video.addEventListener('error', finish, { once: true });
-  safetyTimer = setTimeout(finish, 12_000);
+  safetyTimer = setTimeout(finish, 14_000);
+
+  rafId = requestAnimationFrame(() => {
+    rafId = requestAnimationFrame(() => {
+      if (!video) return;
+      if (video.readyState >= 3) {
+        startPlayback(video);
+      } else {
+        video.addEventListener('canplaythrough', () => startPlayback(video), {
+          once: true,
+        });
+      }
+    });
+  });
 });
 
 onUnmounted(() => {
   if (safetyTimer) clearTimeout(safetyTimer);
-  videoRef.value?.removeEventListener('ended', finish);
-  videoRef.value?.removeEventListener('error', finish);
+  if (rafId !== null) cancelAnimationFrame(rafId);
+  const video = videoRef.value;
+  if (video) {
+    video.removeEventListener('ended', finish);
+    video.removeEventListener('error', finish);
+    video.pause();
+    video.src = '';
+    video.load();
+  }
 });
 </script>
 
 <template>
   <div
-    class="fixed inset-0 z-10000 overflow-hidden"
+    class="loading-root fixed inset-0 z-10000 overflow-hidden"
     :style="{
-      background: '#010208',
+      background: 'var(--color-bg)',
       opacity: fading ? 0 : 1,
       transition: 'opacity 0.35s ease-in-out',
       pointerEvents: fading ? 'none' : 'all',
@@ -47,12 +74,34 @@ onUnmounted(() => {
   >
     <video
       ref="videoRef"
-      src="/loading.mp4"
-      autoplay
+      :src="videoSrc"
       muted
       playsinline
+      preload="auto"
       disablepictureinpicture
-      class="block h-full w-full object-cover"
+      :loop="false"
+      class="loading-video block h-full w-full object-cover"
     />
   </div>
 </template>
+
+<style scoped>
+.loading-root {
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  isolation: isolate;
+  contain: strict;
+}
+
+.loading-video {
+  will-change: transform;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  contain: strict;
+  display: block;
+  image-rendering: auto;
+  object-fit: cover;
+}
+</style>

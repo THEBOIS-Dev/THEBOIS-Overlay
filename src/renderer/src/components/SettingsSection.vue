@@ -11,7 +11,11 @@ defineProps<{ title: string; description?: string }>();
           height: 12px;
           border-radius: 9999px;
           flex-shrink: 0;
-          background: linear-gradient(to bottom, #c4a8ff, #7c3aed);
+          background: linear-gradient(
+            to bottom,
+            var(--color-accent-light),
+            var(--color-accent)
+          );
           opacity: 0.85;
         "
       />
@@ -30,7 +34,11 @@ defineProps<{ title: string; description?: string }>();
         style="
           flex: 1;
           height: 1px;
-          background: linear-gradient(to right, rgba(120, 80, 255, 0.18), transparent);
+          background: linear-gradient(
+            to right,
+            rgba(var(--color-accent-rgb), 0.18),
+            transparent
+          );
         "
       />
     </div>
@@ -54,11 +62,11 @@ defineProps<{ title: string; description?: string }>();
 <style scoped>
 .section-card {
   background: rgba(255, 255, 255, 0.025);
-  border: 1px solid rgba(120, 80, 255, 0.13);
+  border: 1px solid rgba(var(--color-accent-rgb), 0.13);
   border-radius: 12px;
   transition: border-color 200ms ease;
 }
 .section-card:hover {
-  border-color: rgba(120, 80, 255, 0.2);
+  border-color: rgba(var(--color-accent-rgb), 0.2);
 }
 </style>

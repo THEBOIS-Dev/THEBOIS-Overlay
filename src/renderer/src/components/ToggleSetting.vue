@@ -27,12 +27,12 @@ defineEmits<{ update: [value: boolean] }>();
           border-color 180ms ease;
       "
       :style="{
-        background: value ? 'var(--color-accent)' : 'rgba(140, 100, 255, 0.14)',
+        background: value ? 'var(--color-accent)' : 'rgba(var(--color-accent-rgb), 0.12)',
         border: value
-          ? '1px solid rgba(140, 80, 255, 0.5)'
-          : '1px solid rgba(140, 100, 255, 0.25)',
+          ? '1px solid rgba(var(--color-accent-rgb), 0.5)'
+          : '1px solid rgba(var(--color-accent-rgb), 0.2)',
         boxShadow: value
-          ? '0 0 10px rgba(124,58,237,0.4), inset 0 1px 0 rgba(255,255,255,0.15)'
+          ? '0 0 10px rgba(var(--color-accent-rgb),0.4), inset 0 1px 0 rgba(255,255,255,0.15)'
           : 'inset 0 1px 2px rgba(0,0,0,0.25)',
       }"
       @update:checked="$emit('update', $event)"

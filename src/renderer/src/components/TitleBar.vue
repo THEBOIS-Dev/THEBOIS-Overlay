@@ -4,6 +4,7 @@ import { usePlayersStore } from '@renderer/store/players';
 import type { BedwarsMode, Interval } from '@renderer/types';
 import { onClickOutside } from '@vueuse/core';
 import {
+  Activity,
   Camera,
   ChevronDown,
   Home,
@@ -65,7 +66,7 @@ const integratedHeaderStyle = computed(() => {
   return visible
     ? {
         opacity: '1',
-        background: 'rgba(8,5,22,0.95)',
+        background: 'rgba(var(--color-bg-rgb), 0.97)',
         transition: 'opacity 0.15s ease, background 0.15s ease',
       }
     : { opacity: '0.05', transition: 'opacity 0.25s ease' };
@@ -100,6 +101,7 @@ const NAV = [
   { to: '/theme', label: 'Theme', icon: Palette },
   { to: '/settings', label: 'Settings', icon: Settings },
   { to: '/setup', label: 'Setup', icon: Wrench },
+  { to: '/benchmark', label: 'Benchmark', icon: Activity },
 ];
 
 const modeLabel = computed(
@@ -155,7 +157,7 @@ async function doScreenshot(): Promise<void> {
       {
         height: '40px',
         background:
-          'linear-gradient(180deg, rgba(124,58,237,0.05) 0%, rgba(4,6,15,0.5) 100%)',
+          'linear-gradient(180deg, rgba(var(--color-accent-rgb), 0.05) 0%, rgba(4,6,15,0.5) 100%)',
         borderColor: 'var(--color-border)',
       },
       integratedHeaderStyle,
@@ -171,7 +173,7 @@ async function doScreenshot(): Promise<void> {
       >
         <defs>
           <linearGradient
-            id="g1"
+            id="sg1"
             x1="0"
             y1="0"
             x2="1"
@@ -179,64 +181,60 @@ async function doScreenshot(): Promise<void> {
           >
             <stop
               offset="0%"
-              stop-color="#c4a8ff"
+              style="stop-color: var(--color-accent-light)"
             />
             <stop
               offset="100%"
-              stop-color="#7c3aed"
+              style="stop-color: var(--color-accent)"
             />
           </linearGradient>
           <linearGradient
-            id="g2"
-            x1="0"
+            id="sg2"
+            x1="1"
             y1="0"
-            x2="1"
+            x2="0"
             y2="1"
           >
             <stop
               offset="0%"
-              stop-color="#e040fb"
+              style="stop-color: var(--color-accent)"
             />
             <stop
               offset="100%"
-              stop-color="#7c3aed"
+              style="stop-color: var(--color-accent)"
             />
           </linearGradient>
         </defs>
-        <rect
-          x="1"
-          y="1"
-          width="8"
-          height="8"
-          rx="2.2"
-          fill="url(#g1)"
+        <path
+          d="M10 1 L12 8 L19 10 L12 12 L10 19 L8 12 L1 10 L8 8 Z"
+          fill="url(#sg1)"
         />
-        <rect
-          x="11"
-          y="1"
-          width="8"
-          height="8"
-          rx="2.2"
-          fill="url(#g2)"
-          opacity=".65"
+        <path
+          d="M10 1 L12 8 L10 10 L8 8 Z"
+          fill="url(#sg2)"
+          opacity="0.7"
         />
-        <rect
-          x="1"
-          y="11"
-          width="8"
-          height="8"
-          rx="2.2"
-          fill="url(#g2)"
-          opacity=".65"
+        <path
+          d="M19 10 L12 12 L10 10 L12 8 Z"
+          fill="url(#sg2)"
+          opacity="0.5"
         />
-        <rect
-          x="11"
-          y="11"
-          width="8"
-          height="8"
-          rx="2.2"
-          fill="url(#g1)"
-          opacity=".3"
+        <path
+          d="M10 19 L8 12 L10 10 L12 12 Z"
+          fill="url(#sg2)"
+          opacity="0.7"
+        />
+        <path
+          d="M1 10 L8 8 L10 10 L8 12 Z"
+          fill="url(#sg2)"
+          opacity="0.5"
+        />
+        <circle
+          cx="10"
+          cy="10"
+          r="1.5"
+          fill="#fff"
+          opacity="0.55"
         />
       </svg>
       <div class="flex items-center gap-1.5">
@@ -403,12 +401,12 @@ async function doScreenshot(): Promise<void> {
             class="absolute top-full right-0 z-50 mt-1 overflow-hidden"
             style="
               width: 152px;
-              background: rgba(8, 5, 22, 0.98);
-              border: 1px solid rgba(120, 80, 255, 0.18);
+              background: rgba(var(--color-bg-rgb), 0.98);
+              border: 1px solid rgba(var(--color-accent-rgb), 0.18);
               border-radius: var(--radius-lg);
               box-shadow:
                 0 8px 36px rgba(0, 0, 0, 0.65),
-                0 0 0 1px rgba(124, 58, 237, 0.06);
+                0 0 0 1px rgba(var(--color-accent-rgb), 0.06);
               padding: 4px;
             "
             @click.stop
@@ -431,7 +429,7 @@ async function doScreenshot(): Promise<void> {
 
             <div
               class="mx-1.5 my-1 border-t"
-              style="border-color: rgba(120, 80, 255, 0.12)"
+              style="border-color: rgba(var(--color-accent-rgb), 0.12)"
             />
 
             <button
@@ -472,7 +470,7 @@ async function doScreenshot(): Promise<void> {
   padding: 0 9px;
   border-radius: var(--radius-sm);
   background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(120, 80, 255, 0.18);
+  border: 1px solid rgba(var(--color-accent-rgb), 0.18);
   color: var(--color-ink-2);
   font-family: var(--font-sans);
   font-size: 0.76rem;
@@ -488,8 +486,8 @@ async function doScreenshot(): Promise<void> {
 
 .custom-select:hover,
 .custom-select--open {
-  border-color: rgba(124, 58, 237, 0.38);
-  background: rgba(124, 58, 237, 0.08);
+  border-color: rgba(var(--color-accent-rgb), 0.38);
+  background: rgba(var(--color-accent-rgb), 0.08);
   color: var(--color-ink-1);
 }
 
@@ -509,12 +507,12 @@ async function doScreenshot(): Promise<void> {
   left: 0;
   z-index: 50;
   min-width: 100%;
-  background: rgba(8, 5, 22, 0.98);
-  border: 1px solid rgba(120, 80, 255, 0.18);
+  background: rgba(var(--color-bg-rgb), 0.98);
+  border: 1px solid rgba(var(--color-accent-rgb), 0.18);
   border-radius: var(--radius-md);
   box-shadow:
     0 8px 32px rgba(0, 0, 0, 0.6),
-    0 0 0 1px rgba(124, 58, 237, 0.06);
+    0 0 0 1px rgba(var(--color-accent-rgb), 0.06);
   padding: 4px;
   overflow: hidden;
 }
@@ -545,11 +543,11 @@ async function doScreenshot(): Promise<void> {
 
 .custom-dropdown-item--active {
   color: var(--color-accent-light);
-  background: rgba(124, 58, 237, 0.12);
+  background: rgba(var(--color-accent-rgb), 0.12);
 }
 
 .custom-dropdown-item--active:hover {
-  background: rgba(124, 58, 237, 0.18);
+  background: rgba(var(--color-accent-rgb), 0.18);
 }
 
 .custom-dropdown-dot {
@@ -574,11 +572,11 @@ async function doScreenshot(): Promise<void> {
 
 .nav-item--active {
   color: var(--color-accent-light);
-  background: rgba(124, 58, 237, 0.14);
+  background: rgba(var(--color-accent-rgb), 0.14);
 }
 
 .nav-item--active:hover {
-  background: rgba(124, 58, 237, 0.18);
+  background: rgba(var(--color-accent-rgb), 0.18);
 }
 
 .nav-item--muted {

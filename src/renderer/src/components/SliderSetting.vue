@@ -161,7 +161,11 @@ const displayValue = computed(() =>
   position: absolute;
   inset: 0;
 
-  background: linear-gradient(90deg, rgba(124, 58, 237, 0.06), transparent 55%);
+  background: linear-gradient(
+    90deg,
+    rgba(var(--color-accent-rgb), 0.06),
+    transparent 55%
+  );
 
   pointer-events: none;
 }
@@ -175,14 +179,13 @@ const displayValue = computed(() =>
 
   background: linear-gradient(
     90deg,
-    rgba(139, 92, 246, 1) 0%,
-    rgba(168, 85, 247, 1) 50%,
-    rgba(56, 189, 248, 0.95) 100%
+    var(--color-accent) 0%,
+    var(--color-accent-light) 100%
   );
 
   box-shadow:
-    0 0 10px rgba(124, 58, 237, 0.34),
-    0 0 18px rgba(56, 189, 248, 0.12);
+    0 0 10px rgba(var(--color-accent-rgb), 0.34),
+    0 0 18px rgba(var(--color-accent-rgb), 0.12);
 
   transition:
     background 140ms ease,
@@ -205,12 +208,12 @@ const displayValue = computed(() =>
     rgba(225, 225, 235, 0.96)
   );
 
-  border: 1px solid rgba(124, 58, 237, 0.4);
+  border: 1px solid rgba(var(--color-accent-rgb), 0.4);
 
   box-shadow:
-    0 0 0 4px rgba(124, 58, 237, 0.08),
+    0 0 0 4px rgba(var(--color-accent-rgb), 0.08),
     0 2px 10px rgba(0, 0, 0, 0.45),
-    0 0 14px rgba(124, 58, 237, 0.22);
+    0 0 14px rgba(var(--color-accent-rgb), 0.22);
 
   cursor: grab;
 
@@ -225,12 +228,12 @@ const displayValue = computed(() =>
 .slider-thumb:hover {
   transform: scale(1.06);
 
-  border-color: rgba(124, 58, 237, 0.65);
+  border-color: rgba(var(--color-accent-rgb), 0.65);
 
   box-shadow:
-    0 0 0 5px rgba(124, 58, 237, 0.12),
+    0 0 0 5px rgba(var(--color-accent-rgb), 0.12),
     0 2px 12px rgba(0, 0, 0, 0.48),
-    0 0 18px rgba(124, 58, 237, 0.32);
+    0 0 18px rgba(var(--color-accent-rgb), 0.32);
 }
 
 .slider-thumb[data-state='active'] {
@@ -238,19 +241,19 @@ const displayValue = computed(() =>
 
   transform: scale(1.12);
 
-  border-color: rgba(124, 58, 237, 0.82);
+  border-color: rgba(var(--color-accent-rgb), 0.82);
 
   box-shadow:
-    0 0 0 6px rgba(124, 58, 237, 0.16),
+    0 0 0 6px rgba(var(--color-accent-rgb), 0.16),
     0 4px 16px rgba(0, 0, 0, 0.5),
-    0 0 22px rgba(124, 58, 237, 0.42);
+    0 0 22px rgba(var(--color-accent-rgb), 0.42);
 }
 
 .slider-thumb:focus-visible {
   box-shadow:
-    0 0 0 6px rgba(124, 58, 237, 0.18),
+    0 0 0 6px rgba(var(--color-accent-rgb), 0.18),
     0 4px 16px rgba(0, 0, 0, 0.5),
-    0 0 24px rgba(124, 58, 237, 0.48);
+    0 0 24px rgba(var(--color-accent-rgb), 0.48);
 }
 
 .slider-thumb-core {
@@ -259,9 +262,9 @@ const displayValue = computed(() =>
 
   border-radius: 999px;
 
-  background: linear-gradient(180deg, rgba(124, 58, 237, 1), rgba(56, 189, 248, 0.9));
+  background: linear-gradient(180deg, var(--color-accent), var(--color-accent-light));
 
-  box-shadow: 0 0 6px rgba(124, 58, 237, 0.4);
+  box-shadow: 0 0 6px rgba(var(--color-accent-rgb), 0.4);
 }
 
 .slider-value-wrap {

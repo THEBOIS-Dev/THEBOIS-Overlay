@@ -24,6 +24,11 @@ const router = createRouter({
       name: 'Theme',
       component: () => import('@renderer/views/Theme.vue'),
     },
+    {
+      path: '/benchmark',
+      name: 'Benchmark',
+      component: () => import('@renderer/components/BenchmarkPanel.vue'),
+    },
   ],
 });
 
