@@ -4,6 +4,7 @@ import { usePlayersStore } from '@renderer/store/players';
 import type { BedwarsMode, Interval } from '@renderer/types';
 import { onClickOutside } from '@vueuse/core';
 import {
+  Activity,
   Camera,
   ChevronDown,
   Home,
@@ -100,6 +101,7 @@ const NAV = [
   { to: '/theme', label: 'Theme', icon: Palette },
   { to: '/settings', label: 'Settings', icon: Settings },
   { to: '/setup', label: 'Setup', icon: Wrench },
+  { to: '/benchmark', label: 'Benchmark', icon: Activity },
 ];
 
 const modeLabel = computed(

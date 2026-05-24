@@ -6,6 +6,9 @@ const props = withDefaults(defineProps<{ name: string; size?: number }>(), { siz
 const CACHE_TTL = 7 * 24 * 60 * 60 * 1000;
 const STEVE_URL = 'https://mc-heads.net/avatar/steve/32';
 
+const MEM_CACHE = new Map<string, string>();
+const INFLIGHT = new Map<string, Promise<string>>();
+
 const avatarSrc = ref<string | null>(null);
 const errored = ref(false);
 const loading = ref(true);
@@ -16,14 +19,17 @@ function cacheKey(u: string): string {
 }
 
 function getCached(u: string): string | null {
+  const key = cacheKey(u);
+  if (MEM_CACHE.has(key)) return MEM_CACHE.get(key)!;
   try {
-    const raw = localStorage.getItem(cacheKey(u));
+    const raw = localStorage.getItem(key);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as { url: string; ts: number };
     if (Date.now() - parsed.ts > CACHE_TTL) {
-      localStorage.removeItem(cacheKey(u));
+      localStorage.removeItem(key);
       return null;
     }
+    MEM_CACHE.set(key, parsed.url);
     return parsed.url;
   } catch {
     return null;
@@ -31,9 +37,13 @@ function getCached(u: string): string | null {
 }
 
 function setCache(u: string, dataUrl: string): void {
-  try {
-    localStorage.setItem(cacheKey(u), JSON.stringify({ url: dataUrl, ts: Date.now() }));
-  } catch {}
+  const key = cacheKey(u);
+  MEM_CACHE.set(key, dataUrl);
+  queueMicrotask(() => {
+    try {
+      localStorage.setItem(key, JSON.stringify({ url: dataUrl, ts: Date.now() }));
+    } catch {}
+  });
 }
 
 async function blobToDataUrl(blob: Blob): Promise<string> {
@@ -45,6 +55,28 @@ async function blobToDataUrl(blob: Blob): Promise<string> {
   });
 }
 
+async function fetchAvatar(username: string): Promise<string> {
+  const key = cacheKey(username);
+  if (INFLIGHT.has(key)) return INFLIGHT.get(key)!;
+  const promise = (async () => {
+    const url = `https://mc-heads.net/avatar/${encodeURIComponent(username)}/32`;
+    try {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const blob = await res.blob();
+      const dataUrl = await blobToDataUrl(blob);
+      setCache(username, dataUrl);
+      return dataUrl;
+    } catch {
+      return STEVE_URL;
+    } finally {
+      INFLIGHT.delete(key);
+    }
+  })();
+  INFLIGHT.set(key, promise);
+  return promise;
+}
+
 async function loadAvatar(username: string): Promise<void> {
   loading.value = true;
   errored.value = false;
@@ -54,19 +86,8 @@ async function loadAvatar(username: string): Promise<void> {
     loading.value = false;
     return;
   }
-  const url = `https://mc-heads.net/avatar/${encodeURIComponent(username)}/32`;
-  try {
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const blob = await res.blob();
-    const dataUrl = await blobToDataUrl(blob);
-    setCache(username, dataUrl);
-    avatarSrc.value = dataUrl;
-  } catch {
-    avatarSrc.value = STEVE_URL;
-  } finally {
-    loading.value = false;
-  }
+  avatarSrc.value = await fetchAvatar(username);
+  loading.value = false;
 }
 
 function handleError(): void {

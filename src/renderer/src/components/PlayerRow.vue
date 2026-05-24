@@ -24,46 +24,43 @@ defineEmits<{
   remove: [name: string];
 }>();
 
-const nameColor = computed(() => playerNameColor(props.player.profile));
-const topRankDisplay = computed(() => getTopRankDisplay(props.player.profile));
-const staffPlayer = computed(() => isStaff(props.player.profile));
-const clanTag = computed(() => props.player.profile?.clan?.tag ?? null);
-const statsDisabled = computed(() => props.player.error === 'stats_disabled');
+const SHOWCASE_MODE = localStorage.getItem('skip-remove-btn') === '1';
 
-type ClanSegment = { type: 'icon'; value: string } | { type: 'text'; value: string };
+const derived = computed(() => {
+  const profile = props.player.profile;
+  const tag = profile?.clan?.tag ?? null;
+  const statsDisabled = props.player.error === 'stats_disabled';
 
-const parsedClanTag = computed<ClanSegment[] | null>(() => {
-  const tag = clanTag.value;
-  if (!tag) return null;
-
-  const result: ClanSegment[] = [];
-
-  for (const char of tag) {
-    const isIcon = !/[a-zA-Z0-9 ]/.test(char);
-
-    if (isIcon) {
-      result.push({ type: 'icon', value: char });
-    } else {
-      const last = result[result.length - 1];
-
-      if (last && last.type === 'text') {
-        last.value += char;
+  let parsedClanTag: ClanSegment[] | null = null;
+  if (tag) {
+    const result: ClanSegment[] = [];
+    for (const char of tag) {
+      if (/[a-zA-Z0-9 ]/.test(char)) {
+        const last = result[result.length - 1];
+        if (last && last.type === 'text') last.value += char;
+        else result.push({ type: 'text', value: char });
       } else {
-        result.push({ type: 'text', value: char });
+        result.push({ type: 'icon', value: char });
       }
     }
+    parsedClanTag = result.length > 0 ? result : null;
   }
 
-  return result.length > 0 ? result : null;
+  return {
+    nameColor: playerNameColor(profile),
+    topRankDisplay: getTopRankDisplay(profile),
+    staffPlayer: isStaff(profile),
+    statsDisabled,
+    parsedClanTag,
+    privateLevel: statsDisabled
+      ? typeof profile?.rank?.level === 'number'
+        ? profile.rank.level
+        : null
+      : null,
+  };
 });
 
-const privateLevel = computed(() => {
-  if (!statsDisabled.value) return null;
-
-  const lvl = props.player.profile?.rank?.level;
-
-  return typeof lvl === 'number' ? lvl : null;
-});
+type ClanSegment = { type: 'icon'; value: string } | { type: 'text'; value: string };
 
 const errorLabel = computed(() => {
   switch (props.player.error) {
@@ -167,16 +164,16 @@ function cellColor(col: Column): string {
           />
 
           <span
-            v-if="topRankDisplay"
+            v-if="derived.topRankDisplay"
             class="rank-text"
-            :style="{ color: nameColor }"
+            :style="{ color: derived.nameColor }"
           >
-            {{ topRankDisplay }}
+            {{ derived.topRankDisplay }}
           </span>
 
           <span
             class="name-text truncate"
-            :style="{ color: nameColor }"
+            :style="{ color: derived.nameColor }"
           >
             <template v-if="player.nicked && player.name !== player.realName">
               <span style="color: var(--color-nick)">
@@ -196,13 +193,13 @@ function cellColor(col: Column): string {
           </span>
 
           <span
-            v-if="parsedClanTag"
+            v-if="derived.parsedClanTag"
             class="clan-tag-wrapper"
           >
             <span class="clan-bracket">[</span>
 
             <template
-              v-for="(seg, i) in parsedClanTag"
+              v-for="(seg, i) in derived.parsedClanTag"
               :key="i"
             >
               <span
@@ -234,14 +231,14 @@ function cellColor(col: Column): string {
           </span>
 
           <span
-            v-if="staffPlayer"
+            v-if="derived.staffPlayer"
             class="badge badge-staff"
           >
             STAFF
           </span>
 
           <span
-            v-if="statsDisabled"
+            v-if="derived.statsDisabled"
             class="lock-icon-wrapper"
           >
             <svg
@@ -368,12 +365,12 @@ function cellColor(col: Column): string {
           v-else-if="
             player.error === 'stats_disabled' &&
             col === Column.LEVEL &&
-            privateLevel !== null
+            derived.privateLevel !== null
           "
           class="stat-text"
-          :style="{ color: levelColor(privateLevel) }"
+          :style="{ color: levelColor(derived.privateLevel!) }"
         >
-          {{ privateLevel }}
+          {{ derived.privateLevel }}
         </span>
 
         <span
@@ -399,6 +396,7 @@ function cellColor(col: Column): string {
     </td>
 
     <td
+      v-if="!SHOWCASE_MODE"
       class="remove-cell"
       style="overflow: visible !important"
     >
@@ -416,6 +414,7 @@ function cellColor(col: Column): string {
 .player-row {
   position: relative;
   overflow: visible !important;
+  contain: layout style;
 
   background: linear-gradient(
     90deg,
@@ -441,78 +440,54 @@ function cellColor(col: Column): string {
 }
 
 .nicked-row {
-  background:
-    linear-gradient(
-        115deg,
-        transparent 25%,
-        rgba(255, 255, 255, 0.13) 50%,
-        transparent 75%
-      )
-      no-repeat,
-    linear-gradient(
-      90deg,
-      rgba(255, 0, 98, 0.16) 0%,
-      rgba(255, 102, 0, 0.15) 18%,
-      rgba(255, 217, 0, 0.12) 38%,
-      rgba(174, 0, 255, 0.12) 62%,
-      rgba(0, 225, 255, 0.1) 100%
-    );
-
-  background-size:
-    300% 100%,
-    100% 100%;
-  background-position:
-    -200% center,
-    0 0;
-
-  animation: nickShine 3.2s linear infinite;
-
+  position: relative;
+  overflow: hidden !important;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 0, 98, 0.16) 0%,
+    rgba(255, 102, 0, 0.15) 18%,
+    rgba(255, 217, 0, 0.12) 38%,
+    rgba(174, 0, 255, 0.12) 62%,
+    rgba(0, 225, 255, 0.1) 100%
+  );
   box-shadow:
     inset 0 0 0 1px rgba(255, 255, 255, 0.05),
     inset 0 0 18px rgba(255, 0, 140, 0.08),
     0 0 18px rgba(255, 0, 170, 0.08);
 }
 
+.nicked-row::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    115deg,
+    transparent 20%,
+    rgba(255, 255, 255, 0.13) 50%,
+    transparent 80%
+  );
+  transform: translateX(-150%);
+  animation: nickShine 3.2s linear infinite;
+  animation-play-state: var(--anim-play-state, running);
+  pointer-events: none;
+  will-change: transform;
+}
+
 .nicked-row:hover {
   transform: translateY(-1px);
-
-  background:
-    linear-gradient(
-        115deg,
-        transparent 25%,
-        rgba(255, 255, 255, 0.13) 50%,
-        transparent 75%
-      )
-      no-repeat,
-    linear-gradient(
-      90deg,
-      rgba(255, 0, 98, 0.22) 0%,
-      rgba(255, 102, 0, 0.2) 18%,
-      rgba(255, 217, 0, 0.16) 38%,
-      rgba(174, 0, 255, 0.16) 62%,
-      rgba(0, 225, 255, 0.14) 100%
-    );
-
-  background-size:
-    300% 100%,
-    100% 100%;
-  background-position:
-    -200% center,
-    0 0;
-
-  animation: nickShine 3.2s linear infinite;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 0, 98, 0.22) 0%,
+    rgba(255, 102, 0, 0.2) 18%,
+    rgba(255, 217, 0, 0.16) 38%,
+    rgba(174, 0, 255, 0.16) 62%,
+    rgba(0, 225, 255, 0.14) 100%
+  );
 }
 
 @keyframes nickShine {
-  0% {
-    background-position:
-      -200% center,
-      0 0;
-  }
-  100% {
-    background-position:
-      200% center,
-      0 0;
+  to {
+    transform: translateX(250%);
   }
 }
 
@@ -569,11 +544,8 @@ function cellColor(col: Column): string {
   height: 17px;
   font-family: Inter, system-ui, sans-serif;
   line-height: 1;
-  transform: translateZ(0);
-  backface-visibility: hidden;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  text-rendering: geometricPrecision;
 }
 
 .rank-text {
@@ -601,10 +573,7 @@ function cellColor(col: Column): string {
   letter-spacing: 0;
   line-height: 1;
   flex-shrink: 0;
-  transform: translateZ(0);
-  backface-visibility: hidden;
   -webkit-font-smoothing: antialiased;
-  text-rendering: geometricPrecision;
 }
 
 .clan-bracket {
@@ -669,11 +638,7 @@ function cellColor(col: Column): string {
   letter-spacing: 0.02em;
   text-transform: uppercase;
   white-space: nowrap;
-  transform: translateZ(0);
-  backface-visibility: hidden;
   -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  text-rendering: geometricPrecision;
 }
 
 .badge-staff {
@@ -768,13 +733,12 @@ function cellColor(col: Column): string {
 .nick-tooltip {
   background: linear-gradient(
     135deg,
-    rgba(220, 30, 60, 0.92),
-    rgba(255, 80, 30, 0.88),
-    rgba(180, 10, 40, 0.92)
+    rgba(220, 30, 60, 0.97),
+    rgba(255, 80, 30, 0.95),
+    rgba(180, 10, 40, 0.97)
   );
 
   box-shadow: 0 6px 20px rgba(220, 40, 60, 0.5);
-  backdrop-filter: blur(8px);
 }
 
 .nick-tooltip::after {
@@ -784,13 +748,12 @@ function cellColor(col: Column): string {
 .lock-tooltip {
   background: linear-gradient(
     135deg,
-    rgba(160, 60, 210, 0.96),
-    rgba(110, 70, 235, 0.96),
-    rgba(40, 160, 245, 0.96)
+    rgba(160, 60, 210, 0.99),
+    rgba(110, 70, 235, 0.99),
+    rgba(40, 160, 245, 0.99)
   );
 
   box-shadow: 0 6px 20px rgba(130, 60, 220, 0.55);
-  backdrop-filter: blur(8px);
 }
 
 .lock-tooltip::after {

@@ -27,6 +27,8 @@ import {
 const players = usePlayersStore();
 const config = useConfigStore();
 
+const headerBackdrop = computed(() => (config.lowEndMode ? 'none' : 'blur(8px)'));
+
 const activeColumns = computed(() => config.activeColumns);
 
 function colLabel(col: Column): string {
@@ -65,25 +67,41 @@ function getDataTier(p: Player): number {
 }
 
 function sortPlayers(list: Player[]): Player[] {
-  return [...list].sort((a, b) => {
+  const n = list.length;
+  if (n <= 1) return [...list];
+  const keys = new Array<string | number>(n);
+  const tiers = new Array<number>(n);
+  const sortByName = config.sortBy === Column.NAME;
+  const rankIndices = sortByName ? new Array<number>(n) : null;
+  for (let i = 0; i < n; i++) {
+    const p = list[i];
+    keys[i] = getSortKey(p);
+    tiers[i] = getDataTier(p);
+    if (rankIndices) rankIndices[i] = getRankSortIndex(p.profile);
+  }
+  const indices = Array.from({ length: n }, (_, i) => i);
+  const dir = config.sortAscending ? 1 : -1;
+  indices.sort((ai, bi) => {
+    const a = list[ai],
+      b = list[bi];
     if (a.loading && !b.loading) return 1;
     if (!a.loading && b.loading) return -1;
-    const ak = getSortKey(a);
-    const bk = getSortKey(b);
-    const dir = config.sortAscending ? 1 : -1;
-    if (config.sortBy === Column.NAME) {
-      const ra = getRankSortIndex(a.profile);
-      const rb = getRankSortIndex(b.profile);
+    if (sortByName) {
+      const ra = rankIndices![ai],
+        rb = rankIndices![bi];
       if (ra !== rb) return ra - rb;
-      const ta = getDataTier(a);
-      const tb = getDataTier(b);
+      const ta = tiers[ai],
+        tb = tiers[bi];
       if (ta !== tb) return ta - tb;
-      if (typeof ak === 'number' && typeof bk === 'number') return (ak - bk) * dir;
-      return String(ak).localeCompare(String(bk)) * dir;
     }
-    if (typeof ak === 'number' && typeof bk === 'number') return (bk - ak) * dir;
+    const ak = keys[ai],
+      bk = keys[bi];
+    if (typeof ak === 'number' && typeof bk === 'number') {
+      return sortByName ? (ak - bk) * dir : (bk - ak) * dir;
+    }
     return String(ak).localeCompare(String(bk)) * dir;
   });
+  return indices.map((i) => list[i]);
 }
 
 const sortedPlayers = computed((): Player[] => sortPlayers(players.players));
@@ -384,13 +402,6 @@ const headerBackground = computed(() => {
     <div
       v-else
       class="themed-scroll flex-1 overflow-x-auto overflow-y-auto"
-      style="
-        background: radial-gradient(
-          ellipse at 50% 35%,
-          rgba(255, 45, 85, 0.06) 0%,
-          transparent 70%
-        );
-      "
     >
       <template v-if="hasTeamData">
         <table
@@ -402,7 +413,7 @@ const headerBackground = computed(() => {
             class="sticky top-0 z-10"
             :style="{
               background: headerBackground,
-              backdropFilter: 'blur(8px)',
+              backdropFilter: headerBackdrop,
               opacity: config.theme.opacity,
             }"
           >
@@ -479,7 +490,7 @@ const headerBackground = computed(() => {
                             width: '14px',
                             height: '14px',
                             opacity: 0.18,
-                            filter: 'blur(4px)',
+                            filter: config.lowEndMode ? 'none' : 'blur(4px)',
                           }"
                         />
                         <div
@@ -565,12 +576,12 @@ const headerBackground = computed(() => {
                     <div class="relative flex items-center justify-center">
                       <div
                         class="absolute rounded-full"
-                        style="
-                          width: 14px;
-                          height: 14px;
-                          background: rgba(150, 150, 150, 0.08);
-                          filter: blur(3px);
-                        "
+                        :style="{
+                          width: '14px',
+                          height: '14px',
+                          background: 'rgba(150, 150, 150, 0.08)',
+                          filter: config.lowEndMode ? 'none' : 'blur(3px)',
+                        }"
                       />
                       <div
                         class="relative rounded-full"
@@ -628,7 +639,7 @@ const headerBackground = computed(() => {
             class="sticky top-0 z-10"
             :style="{
               background: headerBackground,
-              backdropFilter: 'blur(8px)',
+              backdropFilter: headerBackdrop,
               opacity: config.theme.opacity,
             }"
           >
@@ -694,7 +705,7 @@ const headerBackground = computed(() => {
       :style="{
         borderTop: '0.5px solid rgba(var(--color-accent-rgb), 0.08)',
         background: headerBackground,
-        backdropFilter: 'blur(4px)',
+        backdropFilter: config.lowEndMode ? 'none' : 'blur(4px)',
         opacity: config.theme.opacity,
       }"
     >
@@ -747,6 +758,7 @@ const headerBackground = computed(() => {
   );
   will-change: transform;
   animation: banner-shimmer 6s ease-in-out infinite;
+  animation-play-state: var(--anim-play-state, running);
   pointer-events: none;
 }
 .team-header-row {
@@ -766,13 +778,16 @@ const headerBackground = computed(() => {
   width: 200%;
   left: -100%;
   animation: team-scan 7s ease-in-out infinite;
+  animation-play-state: var(--anim-play-state, running);
   pointer-events: none;
 }
 .team-pip {
   animation: pip-breathe 2.8s ease-in-out infinite;
+  animation-play-state: var(--anim-play-state, running);
 }
 .team-pip-glow {
   animation: pip-breathe 2.8s ease-in-out infinite;
+  animation-play-state: var(--anim-play-state, running);
 }
 .team-name {
   animation: name-settle 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;

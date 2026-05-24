@@ -5,14 +5,14 @@ import { _electron as electron } from 'playwright';
 
 const PIKA_PLAYERS = [
   'voodootje0',
-'JustThiemo',
 'Arrly',
+'JustThiemo',
 '_Luanne',
 'Ehtne',
 'Darnly',
 'Vaitren',
 'tobin',
-'loxamy',
+'Climbby',
 'meoweys',
 'resuns',
 'izoo_',
@@ -22,20 +22,19 @@ const PIKA_PLAYERS = [
 ];
 
 const JARTEX_PLAYERS = [
-  'Si1ent_',
-'Sandy07',
-'DARKpeveresh',
-'meelb',
-'Lexi58',
-'Faoloe',
-'Weeder',
-'Djim',
-'Stxrs',
-'bene_e',
-'JustThiemo',
+  'voodootje0',
 'iFlyYT',
-'voodootje0',
-'climbby',
+'JustThiemo',
+'bene_e',
+'Stxrs',
+'Djim',
+'Faoloe',
+'Climbby',
+'Lexi58',
+'Meelb',
+'DARKpeveresh',
+'Sandy07',
+'Si1ent_',
 'IStayKittens',
 ];
 
@@ -74,24 +73,26 @@ const BASE_CONFIG_SEED = {
   jartexProxyPort: 25567,
   proxyBindHost: '127.0.0.1',
   proxyBannerDismissed: true,
+  paletteId: 'ember',
   theme: {
     bgType: 'solid',
-    bgColor: '#06091400',
+    bgColor: '#130508',
     bgGradientStops: [
-      { color: '#7c3aed', position: 0 },
-      { color: '#06091a', position: 100 },
+      { color: '#ff2d55', position: 0 },
+      { color: '#130508', position: 100 },
     ],
     bgGradientDir: 'to bottom right',
     bgImageUrl: '',
     bgImageOpacity: 0.3,
     opacity: 1,
+    dynamicColors: false,
     colors: {
-      accent: '#7c3aed',
-      accentLight: '#b89aff',
-      border: 'rgba(120,80,255,0.18)',
-      ink1: '#e8e0ff',
-      ink2: '#a89bc2',
-      ink3: '#6b5e82',
+      accent: '#ff2d55',
+      accentLight: '#ff5c7c',
+      border: '#3a1523',
+      ink1: '#ffe9ef',
+      ink2: '#ff4d73',
+      ink3: '#b87586',
       nick: '#fde68a',
       good: '#34d399',
       bad: '#f87171',
@@ -147,6 +148,7 @@ async function captureShowcase(
         localStorage.setItem('nicks', JSON.stringify(nicks));
         localStorage.setItem('skip-loading', '1');
         localStorage.setItem('skip-announcements', '1');
+        localStorage.setItem('skip-remove-btn', '1');
       },
       { cfg: configSeed, nicks: NICKS_SEED },
     );

@@ -629,36 +629,27 @@ input[type='number'] {
   animation-play-state: var(--anim-play-state, running);
 }
 
-html.low-end *,
-html.low-end *::before,
-html.low-end *::after {
-  backdrop-filter: none !important;
-  -webkit-backdrop-filter: none !important;
-  filter: none !important;
-}
-
-html.low-end .ambient-layer {
-  display: none !important;
-}
-
 html.low-end .player-row {
-  contain: layout style;
+  contain: layout style paint;
   transition: none !important;
   box-shadow: none !important;
+  background: transparent !important;
+}
+
+html.low-end .player-row:hover {
+  background: rgba(255, 255, 255, 0.025) !important;
+  transform: none !important;
 }
 
 html.low-end .nicked-row,
 html.low-end .nicked-row:hover {
-  animation: none !important;
-  background: linear-gradient(
-    90deg,
-    rgba(255, 0, 98, 0.13) 0%,
-    rgba(174, 0, 255, 0.1) 50%,
-    rgba(0, 225, 255, 0.09) 100%
-  ) !important;
-  background-size: 100% 100% !important;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04) !important;
+  background: rgba(180, 0, 120, 0.12) !important;
+  box-shadow: none !important;
   transform: none !important;
+}
+
+html.low-end .nicked-row::after {
+  display: none !important;
 }
 
 html.low-end .animate-shimmer {
@@ -675,15 +666,22 @@ html.low-end .animate-row-in {
 }
 
 html.low-end .proxy-banner::before,
-html.low-end .team-header-row::before,
+html.low-end .team-header-row::before {
+  display: none !important;
+}
+
 html.low-end .team-pip,
 html.low-end .team-pip-glow {
   animation: none !important;
 }
 
+html.low-end .team-pip-glow {
+  display: none !important;
+}
+
 html.low-end .btn-accent {
   box-shadow: none !important;
-  transition: opacity 80ms ease !important;
+  transition: opacity 80ms linear !important;
 }
 
 html.low-end .glass-row {
@@ -692,4 +690,49 @@ html.low-end .glass-row {
 
 html.low-end .glass-row:hover {
   background: rgba(var(--color-accent-rgb), 0.06) !important;
+}
+
+html.low-end .rank-text,
+html.low-end .name-text,
+html.low-end .stat-text,
+html.low-end .clan-tag-wrapper {
+  text-shadow: none !important;
+}
+
+html.low-end .clan-icon {
+  -webkit-text-fill-color: #c084fc !important;
+  background-image: none !important;
+  filter: none !important;
+}
+
+html.low-end .nick-badge {
+  filter: none !important;
+}
+
+html.low-end .lock-icon-wrapper svg {
+  filter: none !important;
+}
+
+html.low-end .badge-staff {
+  box-shadow: none !important;
+}
+
+html.low-end .team-indicator {
+  box-shadow: none !important;
+}
+
+html.low-end thead {
+  background: var(--color-bg) !important;
+}
+
+html.low-end header,
+html.low-end .titlebar-backdrop,
+html.low-end .header-blur {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+html.low-end .proxy-banner {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
 }

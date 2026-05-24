@@ -722,38 +722,11 @@ const PROXY_ENTRIES = computed(() => [
         </Section>
 
         <Section title="Performance">
-          <div
-            class="setting-panel flex items-center justify-between gap-3 rounded-xl px-3 py-2.5"
-          >
-            <div>
-              <div class="panel-label">Low-end device mode</div>
-              <div class="panel-desc mt-0.5">
-                Disables backdrop blur, all looping animations, expensive filters, and
-                ambient layers. Replaces the loading video with a lightweight screen.
-                Recommended for older or integrated-GPU hardware.
-              </div>
-            </div>
-            <button
-              class="no-drag mini-toggle relative shrink-0 rounded-full"
-              :style="{
-                background: config.lowEndMode
-                  ? 'var(--color-accent)'
-                  : 'rgba(var(--color-accent-rgb),0.12)',
-                border: config.lowEndMode
-                  ? '1px solid rgba(var(--color-accent-rgb),0.5)'
-                  : '1px solid rgba(var(--color-accent-rgb),0.25)',
-                boxShadow: config.lowEndMode
-                  ? '0 0 10px rgba(var(--color-accent-rgb), 0.35)'
-                  : 'none',
-              }"
-              @click="config.lowEndMode = !config.lowEndMode"
-            >
-              <span
-                class="mini-toggle-thumb"
-                :style="{ left: config.lowEndMode ? '19px' : '3px' }"
-              />
-            </button>
-          </div>
+          <ToggleSetting
+            label="Low-end device mode"
+            :value="config.lowEndMode"
+            @update="config.lowEndMode = $event"
+          />
         </Section>
 
         <Section title="Updates">

@@ -217,7 +217,7 @@ function makeDefaultState(): ConfigState {
     opacity: 0.92,
     roundedCorners: true,
     activeColumns: DEFAULT_COLUMNS,
-    sortBy: Column.FKDR,
+    sortBy: Column.NAME,
     sortAscending: false,
     interval: 'total',
     mode: 'ALL_MODES',

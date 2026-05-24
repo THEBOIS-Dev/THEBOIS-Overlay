@@ -26,6 +26,13 @@ if (process.platform === 'darwin') {
   app.commandLine.appendSwitch('enable-zero-copy');
 }
 
+if (process.platform === 'win32') {
+  app.commandLine.appendSwitch('ignore-gpu-blocklist');
+  app.commandLine.appendSwitch('enable-gpu-rasterization');
+  app.commandLine.appendSwitch('enable-zero-copy');
+  app.commandLine.appendSwitch('disable-gpu-driver-bug-workarounds');
+}
+
 app.commandLine.appendSwitch(
   'enable-hardware-overlays',
   'single-fullscreen,single-on-top',
