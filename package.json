@@ -83,7 +83,7 @@
     "electron-updater": "^6.3.9",
     "electron-window-state": "^5.0.3",
     "lucide-vue-next": "^1.0.0",
-    "minecraft-protocol": "^1.48.0",
+    "minecraft-protocol": "^1.66.2",
     "pinia": "^3.0.4",
     "pinia-plugin-persistedstate": "^4.1.1",
     "radix-vue": "^1.9.9",
