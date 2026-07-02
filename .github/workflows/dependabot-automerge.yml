@@ -1,0 +1,70 @@
+name: Auto-merge Dependabot
+
+on:
+  pull_request:
+    types:
+      - opened
+      - reopened
+      - synchronize
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  automerge-pr:
+    if: github.actor == 'dependabot[bot]'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Approve and enable auto-merge
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+        run: |
+          gh pr review "$PR_URL" --approve
+          gh pr merge "$PR_URL" --auto --squash
+
+  automerge-existing:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Find and process all open Dependabot PRs
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          echo "Searching for open Dependabot PRs..."
+
+          prs=$(gh pr list \
+            --repo "$REPO" \
+            --author "app/dependabot" \
+            --state open \
+            --json number \
+            --jq '.[].number')
+
+          if [ -z "$prs" ]; then
+            echo "No open Dependabot PRs found."
+            exit 0
+          fi
+
+          echo "Found PRs:"
+          echo "$prs"
+
+          for pr in $prs; do
+            echo ""
+            echo "Processing PR #$pr..."
+
+            gh pr review "$pr" \
+              --repo "$REPO" \
+              --approve || echo "Approval failed for #$pr"
+
+            gh pr merge "$pr" \
+              --repo "$REPO" \
+              --auto \
+              --squash || echo "Auto-merge failed for #$pr"
+          done
+
+          echo "Done."
