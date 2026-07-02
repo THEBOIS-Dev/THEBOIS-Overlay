@@ -18,12 +18,34 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Approve and enable auto-merge
+      - name: Wait for PR to become mergeable
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+        run: |
+          for i in {1..30}; do
+            STATE=$(gh pr view "$PR_URL" --json mergeStateStatus --jq .mergeStateStatus)
+            echo "Merge state: $STATE"
+
+            if [ "$STATE" = "CLEAN" ]; then
+              break
+            fi
+
+            sleep 5
+          done
+
+      - name: Approve PR
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_URL: ${{ github.event.pull_request.html_url }}
         run: |
           gh pr review "$PR_URL" --approve
+
+      - name: Enable auto-merge
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+        run: |
           gh pr merge "$PR_URL" --auto --squash
 
   automerge-existing:
@@ -31,13 +53,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Find and process all open Dependabot PRs
+      - name: Process all open Dependabot PRs
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
         run: |
-          echo "Searching for open Dependabot PRs..."
-
           prs=$(gh pr list \
             --repo "$REPO" \
             --author "app/dependabot" \
@@ -50,21 +70,30 @@ jobs:
             exit 0
           fi
 
-          echo "Found PRs:"
-          echo "$prs"
-
           for pr in $prs; do
-            echo ""
-            echo "Processing PR #$pr..."
+            echo "Processing PR #$pr"
+
+            for i in {1..30}; do
+              STATE=$(gh pr view "$pr" \
+                --repo "$REPO" \
+                --json mergeStateStatus \
+                --jq .mergeStateStatus)
+
+              echo "Merge state: $STATE"
+
+              if [ "$STATE" = "CLEAN" ]; then
+                break
+              fi
+
+              sleep 5
+            done
 
             gh pr review "$pr" \
               --repo "$REPO" \
-              --approve || echo "Approval failed for #$pr"
+              --approve || true
 
             gh pr merge "$pr" \
               --repo "$REPO" \
               --auto \
-              --squash || echo "Auto-merge failed for #$pr"
+              --squash || true
           done
-
-          echo "Done."
