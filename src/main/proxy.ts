@@ -1,6 +1,8 @@
 import { EventEmitter } from 'events';
 import type { Socket } from 'net';
 import * as minecraftProtocol from 'minecraft-protocol';
+import { app, clipboard, dialog, shell } from 'electron';
+import { join } from 'path';
 
 const MC_COLOR_BYTE_TO_HEX: Record<number, string> = {
   0: '#000000',
@@ -128,18 +130,16 @@ interface McModule {
 
 const PROXY_VERSION = '1.8';
 const UPSTREAM_TIMEOUT_MS = 15_000;
+const UPSTREAM_AUTH_TIMEOUT_MS = 180_000;
 const UPSTREAM_MAX_RETRIES = 4;
 const UPSTREAM_RETRY_BASE_MS = 800;
+const UPSTREAM_AUTH_CACHE_DIR = join(app.getPath('userData'), 'minecraft-auth-cache');
 
-const INSPECTED_UPSTREAM_PACKETS = new Set([
-  'login',
-  'player_info',
-  'playerlist_item',
-  'teams',
-  'scoreboard_team',
-  'chat',
-  'system_chat',
-]);
+type UpstreamAuthMode = 'microsoft' | 'offline';
+
+function getUpstreamAuthMode(network: ProxyNetwork): UpstreamAuthMode {
+  return network === 'pikanetwork' ? 'microsoft' : 'offline';
+}
 
 function isRetryableError(err: Error): boolean {
   const code = (err as NodeJS.ErrnoException).code ?? '';
@@ -278,14 +278,6 @@ function isNPC(item: Record<string, unknown>): boolean {
   return false;
 }
 
-function safeWrite(target: McClient, name: string, data: Record<string, unknown>): void {
-  if (!target.ended) {
-    try {
-      target.write(name, data);
-    } catch {}
-  }
-}
-
 function safeWriteRaw(target: McClient, buffer: Buffer): void {
   if (!target.ended) {
     try {
@@ -297,7 +289,7 @@ function safeWriteRaw(target: McClient, buffer: Buffer): void {
 function safeEnd(target: McClient, reason?: string): void {
   if (!target.ended) {
     try {
-      target.end(reason);
+      target.end(reason ?? '');
     } catch {}
   }
 }
@@ -603,12 +595,37 @@ class BedwarsProxy extends EventEmitter {
             return;
           }
 
+          const upstreamAuthMode = getUpstreamAuthMode(this.network);
+
           const upstream = mc.createClient({
             host: this.remoteHost,
             port: this.remotePort,
             username,
             version: PROXY_VERSION,
-            auth: 'offline',
+            auth: upstreamAuthMode,
+            profilesFolder: UPSTREAM_AUTH_CACHE_DIR,
+            onMsaCode: (data: {
+              message?: string;
+              user_code?: string;
+              verification_uri?: string;
+              verification_uri_complete?: string;
+            }) => {
+              const url =
+                data.verification_uri_complete ??
+                data.verification_uri ??
+                'https://www.microsoft.com/link';
+              const message =
+                data.message ??
+                `Open ${url} and enter code ${data.user_code ?? ''}`;
+
+              clipboard.writeText(data.verification_uri_complete ?? data.user_code ?? url);
+              void shell.openExternal(url);
+
+              dialog.showMessageBoxSync({
+                type: 'info',
+                message: `Authenticate Minecraft proxy upstream:\n\n${message}\n\nThe link/code was copied to your clipboard.`,
+              });
+            },
             hideErrors: true,
           });
 
@@ -616,21 +633,21 @@ class BedwarsProxy extends EventEmitter {
 
           activeUpstream = upstream;
 
-          const connectTimeout = setTimeout(() => {
-            if (!upstreamReady && !sessionEnded) {
-              safeEnd(upstream);
-              safeEnd(client, 'Upstream connection timed out');
-              teardown();
-            }
-          }, UPSTREAM_TIMEOUT_MS);
+          const connectTimeout = setTimeout(
+            () => {
+              if (!upstreamReady && !sessionEnded) {
+                safeEnd(upstream);
+                safeEnd(client, 'Upstream connection timed out');
+                teardown();
+              }
+            },
+            upstreamAuthMode === 'microsoft' ? UPSTREAM_AUTH_TIMEOUT_MS : UPSTREAM_TIMEOUT_MS,
+          );
 
           (upstream as NodeJS.EventEmitter).on(
             'raw',
             (buffer: Buffer, meta: McPacketMeta) => {
-              if (
-                meta.state !== mc.states.PLAY ||
-                INSPECTED_UPSTREAM_PACKETS.has(meta.name)
-              ) {
+              if (meta.state !== mc.states.PLAY) {
                 return;
               }
 
@@ -645,46 +662,45 @@ class BedwarsProxy extends EventEmitter {
                 return;
               }
 
-              if (meta.name === 'login') {
-                upstreamReady = true;
+              try {
+                if (meta.name === 'login') {
+                  upstreamReady = true;
 
-                clearTimeout(connectTimeout);
+                  clearTimeout(connectTimeout);
 
-                this.clearSessionState();
+                  this.clearSessionState();
 
-                this.emit2({
-                  type: 'teams-update',
-                  network: this.network,
-                  teams: [],
+                  this.emit2({
+                    type: 'teams-update',
+                    network: this.network,
+                    teams: [],
+                  });
+
+                  return;
+                }
+
+                if (meta.name === 'player_info' || meta.name === 'playerlist_item') {
+                  this.handlePlayerInfoPacket(data);
+
+                  return;
+                }
+
+                if (meta.name === 'teams' || meta.name === 'scoreboard_team') {
+                  this.handleTeamPacket(data);
+
+                  this.checkGameState();
+
+                  return;
+                }
+
+                if (meta.name === 'chat' || meta.name === 'system_chat') {
+                  this.handleChatPacket(data);
+                }
+              } catch (err) {
+                console.warn('Failed to inspect upstream packet', {
+                  packet: meta.name,
+                  err,
                 });
-
-                safeWrite(client, meta.name, data);
-
-                return;
-              }
-
-              if (meta.name === 'player_info' || meta.name === 'playerlist_item') {
-                this.handlePlayerInfoPacket(data);
-
-                safeWrite(client, meta.name, data);
-
-                return;
-              }
-
-              if (meta.name === 'teams' || meta.name === 'scoreboard_team') {
-                this.handleTeamPacket(data);
-
-                this.checkGameState();
-
-                safeWrite(client, meta.name, data);
-
-                return;
-              }
-
-              if (meta.name === 'chat' || meta.name === 'system_chat') {
-                this.handleChatPacket(data);
-
-                safeWrite(client, meta.name, data);
               }
             },
           );
@@ -976,7 +992,7 @@ export class ProxyManager extends EventEmitter {
 
     this.pika = new BedwarsProxy(
       'pikanetwork',
-      'play.pika-network.net',
+      'hub.pika.host',
       25565,
       pikaPort,
       bindHost,
