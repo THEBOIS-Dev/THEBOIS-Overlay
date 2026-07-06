@@ -40,7 +40,7 @@ jobs:
       - name: Run semantic-release
         id: release
         env:
-          GITHUB_TOKEN:        ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN:        ${{ secrets.RELEASE_TOKEN }}
           GIT_AUTHOR_NAME:     github-actions[bot]
           GIT_AUTHOR_EMAIL:    github-actions[bot]@users.noreply.github.com
           GIT_COMMITTER_NAME:  github-actions[bot]
