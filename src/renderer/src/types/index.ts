@@ -536,6 +536,15 @@ export type ProxyEventPayload =
   | { type: 'client-connect'; network: string; clientName: string }
   | { type: 'client-disconnect'; network: string; clientName: string }
   | {
+      type: 'auth-code';
+      network: string;
+      userCode: string;
+      verificationUri: string;
+      expiresInSeconds: number;
+    }
+  | { type: 'auth-success'; network: string }
+  | { type: 'auth-error'; network: string; message: string }
+  | {
       type: 'status';
       network: string;
       running: boolean;

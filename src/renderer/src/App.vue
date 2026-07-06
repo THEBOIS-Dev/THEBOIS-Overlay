@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import AnnouncementModal from '@renderer/components/AnnouncementModal.vue';
 import LoadingScreen from '@renderer/components/LoadingScreen.vue';
+import PremiumSignInModal from '@renderer/components/PremiumSignInModal.vue';
 import TitleBar from '@renderer/components/TitleBar.vue';
 import { parseLine } from '@renderer/composables/useLogParser';
 import { useAnnouncements } from '@renderer/composables/useAnnouncements';
+import { usePremiumAuth } from '@renderer/composables/usePremiumAuth';
 import { useConfigStore } from '@renderer/store/config';
 import type { ThemeColors } from '@renderer/store/config';
 import { useNicksStore } from '@renderer/store/nicks';
@@ -33,6 +35,12 @@ function handleVisibilityChange(): void {
 }
 
 const { activeAnnouncement, fetchAnnouncements, dismissActive } = useAnnouncements();
+
+const {
+  active: activePremiumAuth,
+  handleProxyAuthEvent,
+  dismiss: dismissPremiumAuth,
+} = usePremiumAuth();
 
 const isLinux = window.api.platform === 'linux';
 
@@ -545,6 +553,16 @@ function attachProxyListener(): void {
   removeProxyListener = window.api.proxy.onEvent((raw) => {
     const event = raw as ProxyEventPayload;
 
+    if (
+      event.type === 'auth-code' ||
+      event.type === 'auth-success' ||
+      event.type === 'auth-error'
+    ) {
+      handleProxyAuthEvent(event);
+
+      return;
+    }
+
     if (event.type === 'client-connect') {
       players.setProxyConnectedNetwork(event.network);
 
@@ -810,6 +828,13 @@ onUnmounted(() => {
         activeAnnouncement.mode === 'alert' ? activeAnnouncement.payload : undefined
       "
       @close="dismissActive()"
+    />
+
+    <PremiumSignInModal
+      v-if="activePremiumAuth"
+      :key="activePremiumAuth.network"
+      :auth="activePremiumAuth"
+      @close="dismissPremiumAuth()"
     />
   </div>
 </template>

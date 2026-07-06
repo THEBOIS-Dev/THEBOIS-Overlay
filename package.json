@@ -86,6 +86,7 @@
     "minecraft-protocol": "^1.66.2",
     "pinia": "^3.0.4",
     "pinia-plugin-persistedstate": "^4.1.1",
+    "prismarine-nbt": "^2.8.0",
     "radix-vue": "^1.9.9",
     "vue": "^3.5.39",
     "vue-router": "^5.0.7"

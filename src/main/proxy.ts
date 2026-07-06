@@ -1,6 +1,10 @@
 import { EventEmitter } from 'events';
+import * as net from 'net';
+import * as path from 'path';
+import * as os from 'os';
 import type { Socket } from 'net';
 import * as minecraftProtocol from 'minecraft-protocol';
+import { createEncryptedAuthCache } from './auth-cache';
 
 const MC_COLOR_BYTE_TO_HEX: Record<number, string> = {
   0: '#000000',
@@ -84,6 +88,15 @@ export type ProxyEvent =
   | { type: 'client-connect'; network: ProxyNetwork; clientName: string }
   | { type: 'client-disconnect'; network: ProxyNetwork; clientName: string }
   | {
+      type: 'auth-code';
+      network: ProxyNetwork;
+      userCode: string;
+      verificationUri: string;
+      expiresInSeconds: number;
+    }
+  | { type: 'auth-success'; network: ProxyNetwork }
+  | { type: 'auth-error'; network: ProxyNetwork; message: string }
+  | {
       type: 'status';
       network: ProxyNetwork;
       running: boolean;
@@ -126,10 +139,11 @@ interface McModule {
   states: Record<string, string>;
 }
 
-const PROXY_VERSION = '1.8';
+const LOCAL_VERSION = '1.8';
 const UPSTREAM_TIMEOUT_MS = 15_000;
 const UPSTREAM_MAX_RETRIES = 4;
 const UPSTREAM_RETRY_BASE_MS = 800;
+const AUTH_CACHE_DIR = path.join(os.homedir(), '.thebois-overlay', 'msa-cache');
 
 const INSPECTED_UPSTREAM_PACKETS = new Set([
   'login',
@@ -294,7 +308,7 @@ function safeWriteRaw(target: McClient, buffer: Buffer): void {
   }
 }
 
-function safeEnd(target: McClient, reason?: string): void {
+function safeEnd(target: McClient, reason: string = 'Disconnected'): void {
   if (!target.ended) {
     try {
       target.end(reason);
@@ -465,7 +479,7 @@ class BedwarsProxy extends EventEmitter {
         'online-mode': false,
         port: this.localPort,
         host: this.bindHost,
-        version: PROXY_VERSION,
+        version: LOCAL_VERSION,
         motd: `THEBOIS | ${
           this.network === 'pikanetwork' ? 'PikaNetwork' : 'JartexNetwork'
         }`,
@@ -592,33 +606,100 @@ class BedwarsProxy extends EventEmitter {
           }
 
           if (activeUpstream) {
-            safeEnd(activeUpstream);
+            safeEnd(activeUpstream, 'Proxy session ended');
           }
 
-          safeEnd(client);
+          safeEnd(client, 'Disconnected');
         };
 
-        const connectUpstream = (): void => {
+        const connectUpstream = async (forcePremium: boolean): Promise<void> => {
           if (sessionEnded || client.ended) {
             return;
           }
 
-          const upstream = mc.createClient({
+          const baseOptions: Record<string, unknown> = {
             host: this.remoteHost,
             port: this.remotePort,
             username,
-            version: PROXY_VERSION,
-            auth: 'offline',
-            hideErrors: true,
-          });
+            version: LOCAL_VERSION,
+            hideErrors: false,
+            connect: (c: McClient) => {
+              const socket = net.connect({
+                host: this.remoteHost,
+                port: this.remotePort,
+                family: 4,
+              });
+
+              (c as unknown as { setSocket(s: Socket): void }).setSocket(socket);
+            },
+          };
+
+          const upstream = forcePremium
+            ? mc.createClient({
+                ...baseOptions,
+                auth: 'microsoft',
+                profilesFolder: createEncryptedAuthCache(AUTH_CACHE_DIR),
+                onMsaCode: (code: {
+                  user_code?: string;
+                  verification_uri?: string;
+                  expires_in?: number;
+                }) => {
+                  this.emit2({
+                    type: 'auth-code',
+                    network: this.network,
+                    userCode: code?.user_code ?? '',
+                    verificationUri:
+                      code?.verification_uri ?? 'https://microsoft.com/link',
+                    expiresInSeconds: code?.expires_in ?? 900,
+                  });
+                },
+              })
+            : mc.createClient({
+                ...baseOptions,
+                auth: 'offline',
+              });
 
           setNoDelay(upstream);
 
           activeUpstream = upstream;
 
+          let abandoned = false;
+
+          if (!forcePremium) {
+            (upstream as NodeJS.EventEmitter).once('encryption_begin', () => {
+              if (abandoned || sessionEnded || client.ended) {
+                return;
+              }
+
+              abandoned = true;
+
+              console.error(
+                '[proxy] upstream requires premium auth on',
+                this.network,
+                '- switching to Microsoft sign-in',
+              );
+
+              try {
+                (upstream as unknown as { socket?: Socket }).socket?.destroy();
+              } catch {}
+
+              try {
+                upstream.end('Switching to premium auth');
+              } catch {}
+
+              void connectUpstream(true);
+            });
+          }
+
+          let sawAnyBytes = false;
+
+          (upstream as NodeJS.EventEmitter).on('connect', () => {
+            console.error('[proxy] upstream TCP connected on', this.network);
+          });
+
           const connectTimeout = setTimeout(() => {
             if (!upstreamReady && !sessionEnded) {
-              safeEnd(upstream);
+              safeEnd(upstream, 'Upstream connection timed out');
               safeEnd(client, 'Upstream connection timed out');
               teardown();
             }
@@ -627,6 +708,21 @@ class BedwarsProxy extends EventEmitter {
           (upstream as NodeJS.EventEmitter).on(
             'raw',
             (buffer: Buffer, meta: McPacketMeta) => {
+              if (!sawAnyBytes) {
+                sawAnyBytes = true;
+
+                console.error(
+                  '[proxy] upstream first packet received on',
+                  this.network,
+                  'name:',
+                  meta.name,
+                  'state:',
+                  meta.state,
+                  'length:',
+                  buffer.length,
+                );
+              }
+
               if (
                 meta.state !== mc.states.PLAY ||
                 INSPECTED_UPSTREAM_PACKETS.has(meta.name)
@@ -651,6 +747,13 @@ class BedwarsProxy extends EventEmitter {
                 clearTimeout(connectTimeout);
 
                 this.clearSessionState();
+
+                if (forcePremium) {
+                  this.emit2({
+                    type: 'auth-success',
+                    network: this.network,
+                  });
+                }
 
                 this.emit2({
                   type: 'teams-update',
@@ -689,9 +792,40 @@ class BedwarsProxy extends EventEmitter {
             },
           );
 
+          (upstream as NodeJS.EventEmitter).on(
+            'disconnect',
+            (data: { reason?: string }) => {
+              clearTimeout(connectTimeout);
+
+              if (abandoned) {
+                return;
+              }
+
+              if (!upstreamReady && !sessionEnded) {
+                const text = data?.reason ? parseChatToPlain(data.reason) : '';
+
+                if (forcePremium) {
+                  this.emit2({
+                    type: 'auth-error',
+                    network: this.network,
+                    message: text || 'Sign-in failed. Please try again.',
+                  });
+                }
+
+                safeEnd(client, text || 'Disconnected by upstream server');
+              }
+
+              teardown();
+            },
+          );
+
           (upstream as NodeJS.EventEmitter).on('error', (err: Error) => {
             void (async () => {
               clearTimeout(connectTimeout);
+
+              if (abandoned) {
+                return;
+              }
 
               if (
                 !upstreamReady &&
@@ -704,12 +838,22 @@ class BedwarsProxy extends EventEmitter {
 
                 await retryDelay(attempt - 1);
 
-                connectUpstream();
+                await connectUpstream(forcePremium);
 
                 return;
               }
 
               if (!upstreamReady && !sessionEnded) {
+                console.error('[proxy] upstream error on', this.network, err);
+
+                if (forcePremium) {
+                  this.emit2({
+                    type: 'auth-error',
+                    network: this.network,
+                    message: err?.message ?? 'Sign-in failed. Please try again.',
+                  });
+                }
+
                 safeEnd(client, `Upstream error: ${err?.message ?? 'unknown'}`);
               }
 
@@ -719,11 +863,37 @@ class BedwarsProxy extends EventEmitter {
 
           (upstream as NodeJS.EventEmitter).on('end', () => {
             clearTimeout(connectTimeout);
+
+            if (abandoned) {
+              return;
+            }
+
+            if (!upstreamReady && !sessionEnded) {
+              console.error(
+                '[proxy] upstream ended before login completed on',
+                this.network,
+                'sawAnyBytes:',
+                sawAnyBytes,
+                'endReason:',
+                (upstream as unknown as { _endReason?: string })._endReason,
+              );
+
+              if (forcePremium) {
+                this.emit2({
+                  type: 'auth-error',
+                  network: this.network,
+                  message: 'Sign-in failed. Please try again.',
+                });
+              }
+
+              safeEnd(client, `Upstream closed the connection before login completed`);
+            }
+
             teardown();
           });
         };
 
-        connectUpstream();
+        void connectUpstream(false);
 
         (client as NodeJS.EventEmitter).on(
           'raw',
@@ -974,13 +1144,7 @@ export class ProxyManager extends EventEmitter {
   constructor(pikaPort: number, jartexPort: number, bindHost: ProxyBindHost) {
     super();
 
-    this.pika = new BedwarsProxy(
-      'pikanetwork',
-      'play.pika-network.net',
-      25565,
-      pikaPort,
-      bindHost,
-    );
+    this.pika = new BedwarsProxy('pikanetwork', 'pika.host', 25565, pikaPort, bindHost);
 
     this.jartex = new BedwarsProxy(
       'jartexnetwork',

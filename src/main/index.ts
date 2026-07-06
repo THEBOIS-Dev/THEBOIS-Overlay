@@ -48,6 +48,7 @@ import https from 'https';
 import readline from 'readline';
 import { ProxyManager } from './proxy';
 import type { ProxyNetwork, ProxyBindHost } from './proxy';
+import { promoteProxyAcrossClients } from './server-list';
 
 const DEFAULT_PIKA_PROXY_PORT = 25566;
 const DEFAULT_JARTEX_PROXY_PORT = 25567;
@@ -310,6 +311,40 @@ function createWindow(): void {
   } else {
     void win.loadFile(join(__dirname, '../renderer/index.html'));
   }
+}
+
+let promotionDebounce: NodeJS.Timeout | null = null;
+
+function runProxyPromotion(): void {
+  if (!proxyManager) return;
+
+  if (promotionDebounce) clearTimeout(promotionDebounce);
+
+  promotionDebounce = setTimeout(() => {
+    if (!proxyManager) return;
+
+    const status = proxyManager.getStatus();
+
+    void promoteProxyAcrossClients(
+      process.platform,
+      app.getPath('appData'),
+      app.getPath('home'),
+      [
+        {
+          entryName: 'THEBOIS Proxy | PikaNetwork',
+          targetIp: `localhost:${status.pika.port}`,
+          matchIpHints: [/pika/i],
+        },
+        {
+          entryName: 'THEBOIS Proxy | JartexNetwork',
+          targetIp: `localhost:${status.jartex.port}`,
+          matchIpHints: [/jartex/i],
+        },
+      ],
+    ).catch((err) =>
+      dbg.error(`servers.dat promotion failed — ${(err as Error).message}`),
+    );
+  }, 500);
 }
 
 void app.whenReady().then(async () => {
@@ -661,6 +696,7 @@ ipcMain.handle('app:find-lunar-log', async (): Promise<string> => {
   const baseCandidates: string[] = [
     `${home}/.lunarclient/offline`,
     `${home}/.lunarclient/profiles/lunar`,
+    `${home}/.lunarclient/profiles`,
   ];
 
   if (process.platform === 'win32') {
@@ -669,12 +705,14 @@ ipcMain.handle('app:find-lunar-log', async (): Promise<string> => {
     baseCandidates.push(
       `${local}/lunarclient/offline`,
       `${local}/lunarclient/profiles/lunar`,
+      `${local}/lunarclient/profiles`,
     );
   } else if (process.platform === 'darwin') {
     const appSupport = app.getPath('appData');
     baseCandidates.push(
       `${appSupport}/lunarclient/offline`,
       `${appSupport}/lunarclient/profiles/lunar`,
+      `${appSupport}/lunarclient/profiles`,
     );
   }
 
@@ -1000,6 +1038,7 @@ ipcMain.handle('proxy:get-status', () => proxyManager?.getStatus() ?? null);
 ipcMain.handle('proxy:set-port', async (_, network: ProxyNetwork, port: number) => {
   if (!proxyManager) return;
   await proxyManager.updatePort(network, port);
+  runProxyPromotion();
 });
 
 ipcMain.handle('proxy:set-bind-host', async (_, bindHost: ProxyBindHost) => {
