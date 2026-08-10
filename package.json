@@ -88,7 +88,7 @@
     "pinia-plugin-persistedstate": "^4.1.1",
     "prismarine-nbt": "^2.8.0",
     "radix-vue": "^1.9.9",
-    "vue": "^3.5.40",
+    "vue": "^3.5.41",
     "vue-router": "^5.2.0"
   },
   "devDependencies": {
