@@ -1,0 +1,20 @@
+{
+  "name": "@kyra/codemods",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "build": "tsc --project tsconfig.json",
+    "codemod": "tsx src/index.ts"
+  },
+  "dependencies": {
+    "magic-string": "^0.30.17"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.3",
+    "tsx": "^4.19.4",
+    "typescript": "^5.8.3"
+  },
+  "allowScripts": {
+    "esbuild@0.27.7": true
+  }
+}

@@ -1,0 +1,100 @@
+name: Showcase Screenshot
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, master, dev]
+    paths-ignore:
+      - assets/showcase-pika.png
+      - assets/showcase-jartex.png
+
+permissions:
+  contents: write
+
+jobs:
+  showcase:
+    name: Capture & Commit Showcases
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          token: ${{ secrets.RELEASE_TOKEN }}
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Install Playwright test runner
+        run: npm install -D @playwright/test
+
+      - name: Install Playwright browsers + system deps
+        run: |
+          npx playwright install --with-deps chromium
+          sudo apt-get install -y \
+            xvfb \
+            libgbm-dev \
+            libasound2t64 \
+            libatk1.0-0 \
+            libatk-bridge2.0-0 \
+            libcups2 \
+            libdrm2 \
+            libgtk-3-0 \
+            libxcomposite1 \
+            libxdamage1 \
+            libxfixes3 \
+            libxrandr2 \
+            libxshmfence1
+
+      - name: Build app (development mode)
+        run: NODE_ENV=development npx electron-vite build --mode development
+
+      - name: Capture showcase screenshots
+        run: |
+          xvfb-run --auto-servernum --server-args="-screen 0 1920x1080x24" \
+            npx playwright test e2e/showcase.spec.ts --reporter=line
+        env:
+          DISPLAY: :99
+          CI: true
+
+      - name: Commit screenshots to repo
+        run: |
+          mkdir -p assets
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add assets/showcase-pika.png assets/showcase-jartex.png
+
+          git diff --staged --quiet && exit 0
+
+          git commit -m "chore: update showcase screenshots [skip ci]"
+
+          for attempt in 1 2 3 4 5; do
+            git fetch origin "${GITHUB_REF_NAME}"
+            git rebase "origin/${GITHUB_REF_NAME}" && break
+
+            if [ "$attempt" -eq 5 ]; then
+              echo "Rebase kept failing after 5 attempts, giving up."
+              exit 1
+            fi
+
+            sleep $((attempt * 5))
+          done
+
+          for attempt in 1 2 3 4 5; do
+            git push origin "HEAD:${GITHUB_REF_NAME}" && exit 0
+
+            echo "Push rejected, re-fetching and rebasing (attempt $attempt)..."
+            git fetch origin "${GITHUB_REF_NAME}"
+            git rebase "origin/${GITHUB_REF_NAME}"
+            sleep $((attempt * 5))
+          done
+
+          echo "Failed to push showcase screenshots after retries."
+          exit 1

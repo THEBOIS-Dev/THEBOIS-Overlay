@@ -1,0 +1,150 @@
+{
+  "css.lint.unknownAtRules": "ignore",
+  "scss.lint.unknownAtRules": "ignore",
+  "less.lint.unknownAtRules": "ignore",
+
+  "editor.formatOnSave": true,
+  "editor.formatOnPaste": true,
+
+  "editor.tabSize": 2,
+  "editor.insertSpaces": true,
+  "editor.detectIndentation": false,
+
+  "editor.rulers": [90],
+
+  "editor.wordWrap": "off",
+
+  "editor.codeActionsOnSave": {
+    "source.fixAll": "always",
+    "source.fixAll.eslint": "always",
+    "source.organizeImports": "always"
+  },
+
+  "files.trimTrailingWhitespace": true,
+  "files.insertFinalNewline": true,
+  "files.eol": "\n",
+
+  "files.watcherExclude": {
+    "**/.git/**": true,
+    "**/node_modules/**": true,
+    "**/dist/**": true,
+    "**/.output/**": true,
+    "**/.electron-vite/**": true
+  },
+
+  "js/ts.tsdk.path": "node_modules/typescript/lib",
+
+  "js/ts.preferences.importModuleSpecifier": "non-relative",
+
+  "js/ts.preferences.preferTypeOnlyAutoImports": true,
+
+  "js/ts.updateImportsOnFileMove.enabled": "always",
+
+  "js/ts.suggest.autoImports": true,
+
+  "js/ts.format.semicolons": "insert",
+
+  "js/ts.tsserver.experimental.enableProjectDiagnostics": true,
+
+  "js/ts.preferences.includePackageJsonAutoImports": "on",
+
+  "eslint.useFlatConfig": true,
+
+  "eslint.format.enable": true,
+
+  "eslint.workingDirectories": [
+    {
+      "mode": "auto"
+    }
+  ],
+
+  "eslint.validate": [
+    "javascript",
+    "javascriptreact",
+    "typescript",
+    "typescriptreact",
+    "vue"
+  ],
+
+  "tailwindCSS.includeLanguages": {
+    "vue": "html"
+  },
+
+  "tailwindCSS.experimental.classRegex": [
+    ["class:\\s*['\"]([^'\"]*)['\"]", "[^\\s]+"],
+    ["className:\\s*['\"]([^'\"]*)['\"]", "[^\\s]+"]
+  ],
+
+  "tailwindCSS.classAttributes": ["class", "className", "ngClass"],
+
+  "tailwindCSS.emmetCompletions": true,
+
+  "tailwindCSS.validate": true,
+
+  "tailwindCSS.files.exclude": [
+    "**/.git/**",
+    "**/node_modules/**",
+    "**/dist/**",
+    "**/.output/**"
+  ],
+
+  "[vue]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+
+  "[typescript]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+
+  "[javascript]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+
+  "[json]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+
+  "[html]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+
+  "[css]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+
+  "[scss]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+
+  "[markdown]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+
+  "prettier.requireConfig": true,
+
+  "prettier.useEditorConfig": true,
+
+  "prettier.documentSelectors": ["**/*.{js,jsx,ts,tsx,vue,html,css,scss,json,md}"],
+
+  "files.exclude": {
+    "**/.git": true,
+    "**/.DS_Store": true,
+    "**/dist": true,
+    "**/node_modules": true,
+    "**/.output": true,
+    "**/.electron-vite": true
+  },
+
+  "search.exclude": {
+    "**/dist": true,
+    "**/node_modules": true,
+    "**/.output": true,
+    "**/.electron-vite": true
+  },
+
+  "explorer.confirmDelete": false,
+
+  "explorer.confirmDragAndDrop": false,
+
+  "extensions.ignoreRecommendations": false
+}

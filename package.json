@@ -1,0 +1,153 @@
+{
+  "name": "kyra",
+  "version": "1.8.1",
+  "private": true,
+  "description": "Kyra Overlay - A BedWars Stats Overlay",
+  "main": "./out/main/index.js",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "vue-tsc --noEmit && electron-vite build",
+    "postinstall": "install-electron",
+    "preview": "electron-vite preview",
+    "build:win": "npm run build && electron-builder --win",
+    "build:mac": "npm run build && electron-builder --mac",
+    "build:linux": "npm run build && electron-builder --linux",
+    "lint": "eslint . --max-warnings 9999",
+    "lint:fix": "eslint . --fix --max-warnings 9999",
+    "format": "prettier --write \"src/**/*.{ts,vue,css,html}\"",
+    "format:check": "prettier --check \"src/**/*.{ts,vue,css,html}\"",
+    "typecheck": "vue-tsc --noEmit",
+    "codemod": "npm --prefix codemods run codemod",
+    "fix": "npm run codemod && npm run typecheck && npm run lint:fix && npm run format",
+    "knip": "KNIP_DISABLE_RAW_TRANSFER=1 knip"
+  },
+  "build": {
+    "appId": "com.thebois.overlay",
+    "productName": "Kyra Overlay",
+    "protocols": [
+      {
+        "name": "Kyra Overlay Protocol",
+        "schemes": [
+          "kyra-overlay"
+        ]
+      }
+    ],
+    "files": [
+      "out/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "resources/",
+        "to": "resources/",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ],
+    "win": {
+      "artifactName": "Kyra.Overlay.Setup.${version}.${ext}",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "resources/icon.ico"
+    },
+    "mac": {
+      "target": "dmg",
+      "icon": "resources/icon.icns",
+      "identity": null,
+      "hardenedRuntime": false
+    },
+    "linux": {
+      "target": "AppImage",
+      "icon": "resources/icon.png"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "shortcutName": "Kyra Overlay",
+      "createDesktopShortcut": "always",
+      "createStartMenuShortcut": true
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "kyizl",
+        "repo": "kyra",
+        "releaseType": "release"
+      }
+    ]
+  },
+  "dependencies": {
+    "@electron-toolkit/utils": "^4.0.0",
+    "@logdna/tail-file": "^4.0.2",
+    "@vueuse/core": "^14.4.0",
+    "axios": "^1.19.0",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "discord-rpc": "^4.0.1",
+    "dompurify": "^3.4.12",
+    "electron-updater": "^6.8.9",
+    "electron-window-state": "^5.0.3",
+    "gsap": "^3.15.0",
+    "lucide-vue-next": "^1.0.0",
+    "marked": "^15.0.12",
+    "minecraft-data": "^3.110.0",
+    "minecraft-protocol": "^1.66.2",
+    "pinia": "^4.0.2",
+    "pinia-plugin-persistedstate": "^4.1.1",
+    "prismarine-nbt": "^2.8.0",
+    "radix-vue": "^1.9.9",
+    "tailwind-merge": "^3.6.0",
+    "vue": "^3.5.40",
+    "vue-router": "^5.2.0"
+  },
+  "devDependencies": {
+    "@antfu/eslint-config": "^9.3.0",
+    "@electron-toolkit/tsconfig": "^2.0.0",
+    "@electron/rebuild": "^4.2.0",
+    "@playwright/test": "^1.62.1",
+    "@semantic-release/changelog": "^7.0.0",
+    "@semantic-release/commit-analyzer": "^13.0.0",
+    "@semantic-release/git": "^11.0.1",
+    "@semantic-release/github": "^12.0.9",
+    "@semantic-release/npm": "^13.1.5",
+    "@semantic-release/release-notes-generator": "^14.1.1",
+    "@tailwindcss/vite": "^4.3.3",
+    "@types/node": "^26.2.0",
+    "@vitejs/plugin-vue": "^6.0.8",
+    "@vue/tsconfig": "^0.9.1",
+    "conventional-changelog-conventionalcommits": "^10.2.1",
+    "electron": "^43.2.0",
+    "electron-builder": "^26.15.3",
+    "electron-vite": "^5.0.0",
+    "eslint": "^10.8.0",
+    "eslint-config-prettier": "^10.0.0",
+    "eslint-plugin-format": "^2.0.1",
+    "knip": "^6.32.1",
+    "playwright": "^1.62.1",
+    "prettier": "^3.9.6",
+    "prettier-plugin-tailwindcss": "^0.8.1",
+    "semantic-release": "^25.0.8",
+    "tailwindcss": "^4.3.3",
+    "tsx": "^4.23.11",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.10",
+    "vue-tsc": "^3.3.9"
+  },
+  "allowScripts": {
+    "vue-demi@0.14.10": true,
+    "esbuild@0.25.12": true,
+    "esbuild@0.28.1": true,
+    "electron-winstaller@5.4.0": true,
+    "github:devsnek/node-register-scheme#e7cc9a63a1f512565da44cb57316d9fb10750e17": true
+  },
+  "trustedDependencies": [
+    "electron",
+    "@electron/rebuild"
+  ]
+}

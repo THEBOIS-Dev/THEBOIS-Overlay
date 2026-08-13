@@ -1,0 +1,165 @@
+name: CI
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+    branches: [main, dev]
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    name: Quality Checks
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Prettier
+        id: prettier
+        run: npm run format
+
+      - name: ESLint
+        id: eslint
+        run: npm run lint:fix
+
+      - name: TypeScript
+        id: typecheck
+        run: npm run typecheck
+
+      - name: Notify Discord on Failure
+        if: failure()
+        continue-on-error: true
+        env:
+          WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_CI }}
+          REPO: ${{ github.repository }}
+          BRANCH: ${{ github.ref_name }}
+          ACTOR: ${{ github.actor }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_NUMBER: ${{ github.run_number }}
+          WORKFLOW: ${{ github.workflow }}
+          SHA: ${{ github.sha }}
+          EVENT: ${{ github.event_name }}
+          PRETTIER: ${{ steps.prettier.outcome }}
+          ESLINT: ${{ steps.eslint.outcome }}
+          TYPECHECK: ${{ steps.typecheck.outcome }}
+        run: |
+          [ -z "$WEBHOOK_URL" ] && echo "DISCORD_WEBHOOK_CI secret not set, skipping" && exit 0
+
+          badge() {
+            case "$1" in
+              success) echo "Pass"   ;;
+              failure) echo "Failed" ;;
+              *)       echo "Skipped" ;;
+            esac
+          }
+
+          FAILED=""
+          [ "$PRETTIER"  = "failure" ] && FAILED="${FAILED:+$FAILED, }Prettier"
+          [ "$ESLINT"    = "failure" ] && FAILED="${FAILED:+$FAILED, }ESLint"
+          [ "$TYPECHECK" = "failure" ] && FAILED="${FAILED:+$FAILED, }TypeScript"
+          [ -z "$FAILED" ] && FAILED="None"
+
+          desc=$(printf "**Branch:** \`%s\`\n**Commit:** \`%s\`\n**Triggered by:** %s" "$BRANCH" "${SHA:0:7}" "$ACTOR")
+
+          PAYLOAD=$(jq -nc \
+            --arg title "CI — Quality Check Failed" \
+            --arg desc "$desc" \
+            --arg prettier "$(badge "$PRETTIER")" \
+            --arg eslint "$(badge "$ESLINT")" \
+            --arg typecheck "$(badge "$TYPECHECK")" \
+            --arg event "$EVENT" \
+            --arg logs "https://github.com/${REPO}/actions/runs/${RUN_ID}" \
+            --arg footer "${WORKFLOW} | Run #${RUN_NUMBER}" \
+            '{embeds:[{
+              title: $title,
+              description: $desc,
+              color: 15158332,
+              fields: [
+                {name:"Prettier",    value:$prettier,  inline:true},
+                {name:"ESLint",      value:$eslint,    inline:true},
+                {name:"TypeScript",  value:$typecheck, inline:true},
+                {name:"Event",       value:$event,     inline:true},
+                {name:"Logs",        value:$logs,      inline:false}
+              ],
+              footer: {text: $footer}
+            }]}')
+
+          HTTP=$(curl -sS -o /dev/stderr -w "%{http_code}" \
+            -X POST "$WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -d "$PAYLOAD")
+          echo "Discord responded: HTTP $HTTP"
+
+      - name: Notify Discord on Success
+        if: success()
+        continue-on-error: true
+        env:
+          WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_CI }}
+          REPO: ${{ github.repository }}
+          BRANCH: ${{ github.ref_name }}
+          ACTOR: ${{ github.actor }}
+          RUN_ID: ${{ github.run_id }}
+          RUN_NUMBER: ${{ github.run_number }}
+          WORKFLOW: ${{ github.workflow }}
+          SHA: ${{ github.sha }}
+          EVENT: ${{ github.event_name }}
+          PRETTIER: ${{ steps.prettier.outcome }}
+          ESLINT: ${{ steps.eslint.outcome }}
+          TYPECHECK: ${{ steps.typecheck.outcome }}
+        run: |
+          [ -z "$WEBHOOK_URL" ] && echo "DISCORD_WEBHOOK_CI secret not set, skipping" && exit 0
+
+          badge() {
+            case "$1" in
+              success) echo "Pass"   ;;
+              failure) echo "Failed" ;;
+              *)       echo "Skipped" ;;
+            esac
+          }
+
+          desc=$(printf "**Branch:** \`%s\`\n**Commit:** \`%s\`\n**Triggered by:** %s" "$BRANCH" "${SHA:0:7}" "$ACTOR")
+
+          PAYLOAD=$(jq -nc \
+            --arg title "CI — Quality Check Passed" \
+            --arg desc "$desc" \
+            --arg prettier "$(badge "$PRETTIER")" \
+            --arg eslint "$(badge "$ESLINT")" \
+            --arg typecheck "$(badge "$TYPECHECK")" \
+            --arg event "$EVENT" \
+            --arg logs "https://github.com/${REPO}/actions/runs/${RUN_ID}" \
+            --arg footer "${WORKFLOW} | Run #${RUN_NUMBER}" \
+            '{embeds:[{
+              title: $title,
+              description: $desc,
+              color: 327424,
+              fields: [
+                {name:"Prettier",    value:$prettier,  inline:true},
+                {name:"ESLint",      value:$eslint,    inline:true},
+                {name:"TypeScript",  value:$typecheck, inline:true},
+                {name:"Event",       value:$event,     inline:true},
+                {name:"Logs",        value:$logs,      inline:false}
+              ],
+              footer: {text: $footer}
+            }]}')
+
+          HTTP=$(curl -sS -o /dev/stderr -w "%{http_code}" \
+            -X POST "$WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -d "$PAYLOAD")
+          echo "Discord responded: HTTP $HTTP"

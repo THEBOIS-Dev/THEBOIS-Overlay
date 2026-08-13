@@ -1,0 +1,90 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+
+  <defs>
+    <linearGradient id="ghostFill" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#D8B4FF"/>
+      <stop offset="100%" stop-color="#B57BFF"/>
+    </linearGradient>
+
+    <linearGradient id="eyeGloss" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#2A163A"/>
+      <stop offset="100%" stop-color="#0F0718"/>
+    </linearGradient>
+
+    <style>
+
+      .body {
+      fill: url(#ghostFill);
+      stroke: #2B0C45;
+      stroke-width: 15;
+      stroke-linejoin: round;
+      stroke-linecap: round;
+      }
+
+      .eye {
+      fill: url(#eyeGloss);
+      }
+
+      .mouth {
+      stroke: #1A0826;
+      stroke-width: 8;
+      stroke-linecap: round;
+      fill: none;
+      }
+
+    </style>
+
+  </defs>
+
+  <path
+    class="body"
+    d="
+    M128 22
+
+    C194 22 232 64 232 122
+
+    L232 170
+
+    C232 190 220 204 202 204
+    C184 204 174 192 156 192
+    C138 192 130 206 108 206
+    C86 206 78 192 60 192
+    C42 192 24 190 24 170
+
+    L24 122
+
+    C24 64 62 22 128 22
+    Z
+    "
+    />
+
+  <ellipse class="eye" cx="90" cy="112" rx="28" ry="34"/>
+  <ellipse class="eye" cx="166" cy="112" rx="28" ry="34"/>
+
+  <circle cx="80" cy="98" r="10" fill="white" opacity="0.98"/>
+  <circle cx="156" cy="98" r="10" fill="white" opacity="0.98"/>
+
+  <ellipse cx="98" cy="122" rx="5" ry="7" fill="#CFAEFF" opacity="0.95"/>
+  <ellipse cx="174" cy="122" rx="5" ry="7" fill="#CFAEFF" opacity="0.95"/>
+
+  <path
+    d="M62 74 L65 81 L72 84 L65 87 L62 94 L59 87 L52 84 L59 81 Z"
+    fill="white"
+    opacity="0.9"
+    />
+
+  <path
+    d="M196 58 L199 65 L206 68 L199 71 L196 78 L193 71 L186 68 L193 65 Z"
+    fill="white"
+    opacity="0.9"
+    />
+
+  <path
+    class="mouth"
+    d="
+    M112 160
+    Q128 172 144 160
+    "
+    />
+
+  </svg>

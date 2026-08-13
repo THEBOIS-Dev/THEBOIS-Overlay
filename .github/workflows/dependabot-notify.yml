@@ -1,0 +1,87 @@
+name: Dependabot Notify
+
+on:
+  pull_request_target:
+    types: [opened, reopened]
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  notify:
+    name: Notify Discord — Dependency Update
+    runs-on: ubuntu-latest
+    if: github.actor == 'dependabot[bot]'
+
+    steps:
+      - name: Extract Dependabot metadata
+        id: meta
+        uses: dependabot/fetch-metadata@v3
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Post to Discord
+        continue-on-error: true
+        env:
+          WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_DEPENDABOT }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          ECOSYSTEM: ${{ steps.meta.outputs.package-ecosystem }}
+          DEP_NAMES: ${{ steps.meta.outputs.dependency-names }}
+          UPDATE_TYPE: ${{ steps.meta.outputs.update-type }}
+          PREV_VERSION: ${{ steps.meta.outputs.previous-version }}
+          NEW_VERSION: ${{ steps.meta.outputs.new-version }}
+          COMPAT_SCORE: ${{ steps.meta.outputs.compatibility-score }}
+        run: |
+          [ -z "$WEBHOOK_URL" ] && echo "DISCORD_WEBHOOK_DEPENDABOT secret not set, skipping" && exit 0
+
+          case "$UPDATE_TYPE" in
+            version-update:semver-major) COLOR=15158332 ;;
+            version-update:semver-minor) COLOR=16776960 ;;
+            version-update:semver-patch) COLOR=5763719  ;;
+            *)                           COLOR=9807270  ;;
+          esac
+
+          COMPAT_DISPLAY="${COMPAT_SCORE}%"
+          [ -z "$COMPAT_SCORE" ] && COMPAT_DISPLAY="—"
+
+          PAYLOAD=$(jq -nc \
+            --arg title "Dependabot — PR #${PR_NUMBER} Opened" \
+            --arg desc "**${PR_TITLE}**\n**Repository:** ${REPO}" \
+            --arg url "$PR_URL" \
+            --argjson color "$COLOR" \
+            --arg ecosystem "\`${ECOSYSTEM:-unknown}\`" \
+            --arg dep "\`${DEP_NAMES:-unknown}\`" \
+            --arg prev "\`${PREV_VERSION:-—}\`" \
+            --arg next "\`${NEW_VERSION:-—}\`" \
+            --arg utype "\`${UPDATE_TYPE:-—}\`" \
+            --arg compat "$COMPAT_DISPLAY" \
+            --arg pr_link "$PR_URL" \
+            '{embeds:[{
+              title: $title,
+              description: $desc,
+              url: $url,
+              color: $color,
+              fields: [
+                {name:"Ecosystem",           value:$ecosystem, inline:true},
+                {name:"Dependency",          value:$dep,       inline:true},
+                {name:"Previous Version",    value:$prev,      inline:true},
+                {name:"New Version",         value:$next,      inline:true},
+                {name:"Update Type",         value:$utype,     inline:true},
+                {name:"Compatibility Score", value:$compat,    inline:true},
+                {name:"Pull Request",        value:$pr_link,   inline:false}
+              ],
+              footer: {text: "Dependabot | Automated Dependency Update"}
+            }]}')
+
+          HTTP=$(curl -sS -o /dev/stderr -w "%{http_code}" \
+            -X POST "$WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -d "$PAYLOAD")
+          echo "Discord responded: HTTP $HTTP"
