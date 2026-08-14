@@ -4,7 +4,7 @@
 
 <br/>
 
-<img src="https://raw.githubusercontent.com/kyizl/kyra/main/resources/icon.png" width="64" alt="icon" />
+<img src="https://raw.githubusercontent.com/kyizl/kyra/main/resources/icon.png" width="286" alt="icon" />
 
 <br/><br/>
 
