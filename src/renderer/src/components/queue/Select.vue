@@ -1,6 +1,6 @@
 <script setup lang="ts" generic="T extends string | number">
-import { dropEnter, dropLeave } from '@renderer/lib/motion';
 import type { SelectOption } from '@renderer/types/queue-safety';
+import { dropEnter, dropLeave } from '@renderer/lib/motion';
 import { onClickOutside } from '@vueuse/core';
 import { ChevronDown } from 'lucide-vue-next';
 import { computed, inject, onBeforeUnmount, ref, watch } from 'vue';
@@ -14,15 +14,6 @@ const emit = defineEmits<{ 'update:modelValue': [value: T] }>();
 
 const open = ref(false);
 const rootRef = ref<HTMLElement | null>(null);
-
-// The app window is a click-through overlay by default (see App.vue's
-// evaluatePointer): it only becomes interactive while the mouse is over an
-// element matched by hit-testing, which relies on mousemove sampling. A
-// dropdown's option list is absolutely positioned outside the trigger's own
-// bounds, so without this flag there's a race between the list appearing and
-// the next mousemove being processed - clicks on options (like the new
-// "Username" one) can land while the window is still ignoring mouse events.
-// Mirrors the pattern in TitleBar.vue's dropdowns.
 const dropdownOpen = inject<ReturnType<typeof ref<boolean>>>('dropdownOpen', ref(false));
 
 watch(open, (isOpen) => {

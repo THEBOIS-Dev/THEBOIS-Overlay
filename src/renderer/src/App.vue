@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import type { ThemeColors } from '@renderer/store/config';
+import type { ProxyEventPayload } from '@renderer/types';
 import AnnouncementModal from '@renderer/components/AnnouncementModal.vue';
 import DiscordLinkModal from '@renderer/components/DiscordLinkModal.vue';
 import LoadingScreen from '@renderer/components/LoadingScreen.vue';
@@ -12,11 +14,9 @@ import { usePremiumAuth } from '@renderer/composables/usePremiumAuth';
 import { useQueueSafety } from '@renderer/composables/useQueueSafety';
 import { useTelemetryAuth } from '@renderer/composables/useTelemetryAuth';
 import { mark, startPerfLogging, stopPerfLogging } from '@renderer/lib/perf-bus';
-import type { ThemeColors } from '@renderer/store/config';
 import { useConfigStore } from '@renderer/store/config';
 import { useNicksStore } from '@renderer/store/nicks';
 import { usePlayersStore } from '@renderer/store/players';
-import type { ProxyEventPayload } from '@renderer/types';
 import { computed, onMounted, onUnmounted, provide, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 
@@ -112,11 +112,6 @@ const {
   dismiss: dismissQueueSafety,
 } = useQueueSafety();
 
-// The Queue view already surfaces the same verdict in its own header banner
-// and live preview, so suppress the floating global alert while the user is
-// on that page - otherwise the two banners stack/overlap and duplicate the
-// same message. It still reappears immediately on navigating away, since
-// this only gates the render and never touches `dismissed`.
 const queueSafetyVisible = computed(
   () => queueSafetyVisibleRaw.value && router.currentRoute.value.name !== 'Queue',
 );
@@ -180,8 +175,6 @@ let desiredIgnoring = false;
 let committedIgnoring = false;
 let ignoreCommitTimer: ReturnType<typeof setTimeout> | null = null;
 
-const IGNORE_COMMIT_DEBOUNCE_MS = 45;
-
 const headerHovered = ref(false);
 const dropdownOpen = ref(false);
 
@@ -223,10 +216,9 @@ function setIgnore(ignore: boolean): void {
   ignoreCommitTimer = setTimeout(() => {
     ignoreCommitTimer = null;
     if (!desiredIgnoring) commitIgnore(false);
-  }, IGNORE_COMMIT_DEBOUNCE_MS);
+  }, 45);
 }
 
-const WAKE_DWELL_MS = 90;
 let pendingWakeKey: string | null = null;
 let pendingWakeSince = 0;
 
@@ -249,7 +241,7 @@ function requestWake(key: string, fromForwarded: boolean): void {
     return;
   }
 
-  if (now - pendingWakeSince >= WAKE_DWELL_MS) {
+  if (now - pendingWakeSince >= 90) {
     setIgnore(false);
   }
 }

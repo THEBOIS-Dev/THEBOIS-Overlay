@@ -6,7 +6,6 @@ import { EventEmitter } from 'node:events';
 import { connect } from 'node:net';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import getMcData from 'minecraft-data';
 import { createClient, createServer, states } from 'minecraft-protocol';
 import { createEncryptedAuthCache, purgeLegacyPlaintextCache } from './auth-cache';
 import {
@@ -18,11 +17,6 @@ import {
   parseChatToPlain,
   stripColorCodes,
 } from './chat-color-utils';
-
-interface MinecraftDataVersionInfo {
-  registryCodec?: unknown;
-  loginPacket?: { dimensionCodec?: unknown };
-}
 
 export type ProxyNetwork = 'pikanetwork' | 'jartexnetwork';
 export type ProxyBindHost = '0.0.0.0' | '127.0.0.1';
@@ -193,13 +187,18 @@ export class BedwarsProxy extends EventEmitter {
         maxPlayers: 5,
         hideErrors: false,
         beforeLogin: (client: McClient) => {
-          try {
-            const versionData = getMcData(client.version) as MinecraftDataVersionInfo;
-            serverConfig.registryCodec =
-              versionData.registryCodec === false
-                ? versionData.loginPacket?.dimensionCodec
-                : (versionData.registryCodec ?? versionData.loginPacket?.dimensionCodec);
-          } catch {}
+          client.once('login_acknowledged', () => {
+            const write = client.write.bind(client);
+            client.write = (name, data) => {
+              if (name !== 'registry_data' && name !== 'finish_configuration') {
+                write(name, data);
+              }
+            };
+            queueMicrotask(() => {
+              client.write = write;
+              client.emit('proxy-configuration-ready');
+            });
+          });
         },
       };
       const server = createServer(serverConfig);
@@ -261,7 +260,7 @@ export class BedwarsProxy extends EventEmitter {
           error: error.message,
         });
       });
-      server.on('playerJoin', (client: McClient) => {
+      server.on('login', (client: McClient) => {
         try {
           client.socket?.setNoDelay(true);
         } catch {}
@@ -279,6 +278,35 @@ export class BedwarsProxy extends EventEmitter {
         let attempt = 0;
         let activeUpstream: McClient | null = null;
         const pendingClientBuffers: Buffer[] = [];
+        const pendingUpstreamBuffers: Buffer[] = [];
+        const pendingConfigurationBuffers: Buffer[] = [];
+        let configurationReady = false;
+        const flushConfiguration = (): void => {
+          if (!configurationReady) return;
+          for (const buffer of pendingConfigurationBuffers.splice(0)) {
+            if (!client.ended) {
+              try {
+                client.writeRaw(buffer);
+              } catch {}
+            }
+          }
+        };
+        client.on('proxy-configuration-ready', () => {
+          configurationReady = true;
+          flushConfiguration();
+        });
+        const flushUpstreamBuffers = (joinedClient: McClient): void => {
+          if (joinedClient !== client) return;
+          for (const buffer of pendingUpstreamBuffers.splice(0)) {
+            if (!client.ended) {
+              try {
+                client.writeRaw(buffer);
+              } catch {}
+            }
+          }
+          server.off('playerJoin', flushUpstreamBuffers);
+        };
+        server.on('playerJoin', flushUpstreamBuffers);
         const flushPendingClientBuffers = (): void => {
           if (!upstreamReady || !activeUpstream || pendingClientBuffers.length === 0)
             return;
@@ -294,6 +322,7 @@ export class BedwarsProxy extends EventEmitter {
         const teardown = (): void => {
           if (sessionEnded) return;
           sessionEnded = true;
+          server.off('playerJoin', flushUpstreamBuffers);
           this.sessions.delete(sessionKey);
           this.emitProxyEvent({
             type: 'client-disconnect',
@@ -378,44 +407,55 @@ export class BedwarsProxy extends EventEmitter {
               void connectUpstream(true);
             });
           }
-          const connectTimeout = setTimeout(() => {
-            if (!upstreamReady && !sessionEnded) {
-              if (!upstream.ended) {
-                try {
-                  upstream.end('Upstream connection timed out');
-                } catch {}
+          let connectTimeout: NodeJS.Timeout | undefined;
+          upstream.once('connect', () => {
+            connectTimeout = setTimeout(() => {
+              if (!upstreamReady && !sessionEnded && upstream === activeUpstream) {
+                if (!upstream.ended) {
+                  try {
+                    upstream.end('Upstream connection timed out');
+                  } catch {}
+                }
+                if (!client.ended) {
+                  try {
+                    client.end('Upstream connection timed out');
+                  } catch {}
+                }
+                teardown();
               }
-              if (!client.ended) {
-                try {
-                  client.end('Upstream connection timed out');
-                } catch {}
-              }
-              teardown();
-            }
-          }, 15_000);
+            }, 15_000);
+          });
           (upstream as NodeJS.EventEmitter).on(
             'raw',
             (buffer: Buffer, meta: McPacketMeta) => {
-              if (meta.state !== states.PLAY) return;
+              if (upstream !== activeUpstream || meta.state !== states.PLAY) return;
               if (meta.name === 'login') {
                 upstreamReady = true;
                 clearTimeout(connectTimeout);
               }
-              if (!client.ended) {
+              if (!client.ended && client.state === states.PLAY) {
                 try {
                   client.writeRaw(buffer);
                 } catch {}
+              } else {
+                pendingUpstreamBuffers.push(buffer);
               }
             },
           );
           (upstream as NodeJS.EventEmitter).on(
             'packet',
-            (data: Record<string, unknown>, meta: McPacketMeta) => {
+            (data: Record<string, unknown>, meta: McPacketMeta, buffer: Buffer) => {
+              if (upstream !== activeUpstream) return;
+              if (meta.state === states.CONFIGURATION) {
+                pendingConfigurationBuffers.push(buffer);
+                flushConfiguration();
+                return;
+              }
               if (meta.state !== states.PLAY) return;
               if (meta.name === 'login') {
                 upstreamReady = true;
                 clearTimeout(connectTimeout);
-                if (activeUpstream) flushPendingClientBuffers();
+                flushPendingClientBuffers();
                 this.clearSessionState();
                 if (forcePremium) {
                   this.emitProxyEvent({ type: 'auth-success', network: this.network });
@@ -445,7 +485,7 @@ export class BedwarsProxy extends EventEmitter {
             'disconnect',
             (data: { reason?: string }) => {
               clearTimeout(connectTimeout);
-              if (abandoned) return;
+              if (abandoned || upstream !== activeUpstream) return;
               if (!upstreamReady && !sessionEnded) {
                 const text =
                   data.reason !== undefined ? parseChatToPlain(data.reason) : '';
@@ -468,7 +508,7 @@ export class BedwarsProxy extends EventEmitter {
           (upstream as NodeJS.EventEmitter).on('error', (error: Error) => {
             void (async () => {
               clearTimeout(connectTimeout);
-              if (abandoned) return;
+              if (abandoned || upstream !== activeUpstream) return;
               if (
                 !upstreamReady &&
                 isRetryableError(error) &&
@@ -500,7 +540,7 @@ export class BedwarsProxy extends EventEmitter {
           });
           (upstream as NodeJS.EventEmitter).on('end', () => {
             clearTimeout(connectTimeout);
-            if (abandoned) return;
+            if (abandoned || upstream !== activeUpstream) return;
             if (!upstreamReady && !sessionEnded) {
               if (forcePremium) {
                 this.emitProxyEvent({
@@ -694,13 +734,7 @@ export class ProxyManager extends EventEmitter {
 
   constructor(pikaPort: number, jartexPort: number, bindHost: ProxyBindHost) {
     super();
-    this.pika = new BedwarsProxy(
-      'pikanetwork',
-      'play.pika.host',
-      25565,
-      pikaPort,
-      bindHost,
-    );
+    this.pika = new BedwarsProxy('pikanetwork', 'pika.host', 25565, pikaPort, bindHost);
     this.jartex = new BedwarsProxy(
       'jartexnetwork',
       'play.jartex.fun',

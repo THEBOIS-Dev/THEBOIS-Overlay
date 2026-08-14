@@ -1,10 +1,10 @@
 <script setup lang="ts">
+import type { Player } from '@renderer/types';
 import PlayerRow from '@renderer/components/PlayerRow.vue';
 import { Button } from '@renderer/components/ui/button';
 import { shouldAutoFitWindow } from '@renderer/lib/window-sizing';
 import { useConfigStore } from '@renderer/store/config';
 import { usePlayersStore } from '@renderer/store/players';
-import type { Player } from '@renderer/types';
 import {
   Column,
   COLUMNS,
@@ -14,16 +14,7 @@ import {
   statColor,
   statVal,
 } from '@renderer/types';
-import {
-  AlertTriangle,
-  ChevronDown,
-  ChevronUp,
-  Info,
-  Swords,
-  Users,
-  Wifi,
-  X,
-} from 'lucide-vue-next';
+import { ChevronDown, ChevronUp, Info, Swords, Users, Wifi, X } from 'lucide-vue-next';
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
 
 const players = usePlayersStore();
@@ -450,6 +441,24 @@ const ungroupedPlayers = computed((): Player[] =>
   hasTeamData.value ? sortPlayers(players.players.filter((player) => !player.team)) : [],
 );
 
+const ungroupedFkdr = computed(() => {
+  const loaded = ungroupedPlayers.value.filter(
+    (player) => player.stats && !player.loading,
+  );
+  if (!loaded.length) return { value: '—', color: 'var(--color-ink-3)' };
+  const sum = loaded.reduce(
+    (acc, player) =>
+      acc +
+      ratio(
+        statVal(player.stats?.['Final kills']),
+        statVal(player.stats?.['Final deaths']),
+      ),
+    0,
+  );
+  const avg = sum / loaded.length;
+  return { value: fmt(avg), color: statColor(avg, [0, 1, 2, 4, 7, 12, 20, 35]) };
+});
+
 function removePlayer(name: string): void {
   players.removeByName(name);
 }
@@ -507,30 +516,6 @@ const activeNetworkPort = computed(() =>
 
 <template>
   <div class="app-shell flex h-full flex-col overflow-hidden">
-    <div
-      v-if="players.logPathValid === false"
-      class="flex shrink-0 items-center justify-between gap-3 px-3.5 py-1.5"
-      style="
-        background: rgba(251, 191, 36, 0.06);
-        border-bottom: 1px solid rgba(251, 191, 36, 0.15);
-        color: #fbbf24;
-      "
-    >
-      <div class="flex items-center gap-2">
-        <AlertTriangle :size="12" />
-        <span style="font-size: 0.79rem"
-          >Log file not configured. Auto-detection disabled.</span
-        >
-      </div>
-      <router-link
-        to="/setup"
-        class="font-semibold underline underline-offset-2 transition-opacity hover:opacity-70"
-        style="font-size: 0.79rem"
-      >
-        Fix →
-      </router-link>
-    </div>
-
     <div
       v-if="showProxyBanner"
       class="no-drag proxy-banner flex shrink-0 items-center justify-between gap-3 px-3 py-2"
@@ -742,21 +727,24 @@ const activeNetworkPort = computed(() =>
                       class="team-bar"
                       :style="{ '--team-color': group.color }"
                     >
-                      <div class="team-bar-content">
-                        <div class="team-bar-label">
-                          <span class="team-bar-name">{{ group.name }}</span>
-                          <span class="team-bar-count">
-                            {{ group.players.length
-                            }}{{ group.players.length === 1 ? ' PLAYER' : ' PLAYERS' }}
-                          </span>
-                        </div>
-                        <div
-                          class="team-bar-stat"
-                          :style="{ '--stat-color': group.avgFkdrColor }"
-                        >
-                          <span class="team-bar-stat-value">{{ group.avgFkdr }}</span>
-                          <span class="team-bar-stat-label">FKDR</span>
-                        </div>
+                      <span
+                        class="team-bar-ghost"
+                        aria-hidden="true"
+                        >{{ group.name.charAt(0) }}</span
+                      >
+                      <div class="team-bar-flag">
+                        <span class="team-bar-name">{{ group.name }}</span>
+                      </div>
+                      <span class="team-bar-count">
+                        {{ group.players.length
+                        }}{{ group.players.length === 1 ? ' PLAYER' : ' PLAYERS' }}
+                      </span>
+                      <div
+                        class="team-bar-stat"
+                        :style="{ '--stat-color': group.avgFkdrColor }"
+                      >
+                        <span class="team-bar-stat-value">{{ group.avgFkdr }}</span>
+                        <span class="team-bar-stat-label">FKDR</span>
                       </div>
                     </div>
                   </td>
@@ -776,54 +764,28 @@ const activeNetworkPort = computed(() =>
                     style="padding: 0"
                   >
                     <div
-                      class="flex items-center gap-2.5 px-3 py-2"
-                      style="
-                        background: rgba(255, 255, 255, 0.015);
-                        border-top: 1px solid rgba(255, 255, 255, 0.045);
-                        border-bottom: 1px solid rgba(255, 255, 255, 0.03);
-                      "
+                      class="team-bar"
+                      style="--team-color: #8a8a8a"
                     >
-                      <div class="relative flex items-center justify-center">
-                        <div
-                          class="absolute rounded-full"
-                          :style="{
-                            width: '14px',
-                            height: '14px',
-                            background: 'rgba(150, 150, 150, 0.08)',
-                            filter: config.lowEndMode ? 'none' : 'blur(3px)',
-                          }"
-                        />
-                        <div
-                          class="relative rounded-full"
-                          style="
-                            width: 6px;
-                            height: 6px;
-                            background: rgba(120, 120, 120, 0.35);
-                            border: 1px solid rgba(150, 150, 150, 0.2);
-                          "
-                        />
+                      <span
+                        class="team-bar-ghost"
+                        aria-hidden="true"
+                        >?</span
+                      >
+                      <div class="team-bar-flag team-bar-flag--muted">
+                        <span class="team-bar-name">Unassigned</span>
                       </div>
-                      <span
-                        class="font-black uppercase"
-                        style="
-                          font-size: 0.6rem;
-                          letter-spacing: 0.18em;
-                          color: var(--color-ink-3);
-                        "
-                        >Unassigned</span
-                      >
-                      <span
-                        class="rounded-full font-bold tabular-nums"
-                        style="
-                          font-size: 0.56rem;
-                          padding: 1px 6px;
-                          background: rgba(255, 255, 255, 0.04);
-                          border: 1px solid rgba(255, 255, 255, 0.08);
-                          color: var(--color-ink-3);
-                        "
-                      >
-                        {{ ungroupedPlayers.length }}
+                      <span class="team-bar-count">
+                        {{ ungroupedPlayers.length
+                        }}{{ ungroupedPlayers.length === 1 ? ' PLAYER' : ' PLAYERS' }}
                       </span>
+                      <div
+                        class="team-bar-stat"
+                        :style="{ '--stat-color': ungroupedFkdr.color }"
+                      >
+                        <span class="team-bar-stat-value">{{ ungroupedFkdr.value }}</span>
+                        <span class="team-bar-stat-label">FKDR</span>
+                      </div>
                     </div>
                   </td>
                 </tr>
@@ -1155,106 +1117,113 @@ html.window-unfocused .stats-box {
 }
 .team-bar {
   position: relative;
-  isolation: isolate;
+  display: flex;
+  align-items: stretch;
+  height: 30px;
+  margin: 7px 0 3px;
   overflow: hidden;
-  margin: 7px 8px 3px;
-  border-radius: var(--radius-md);
-  background: linear-gradient(
-    150deg,
-    color-mix(in srgb, var(--team-color) 16%, var(--color-surface-2)) 0%,
-    var(--color-surface-1) 80%
-  );
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.05),
-    0 10px 22px -16px rgba(0, 0, 0, 0.6);
+  background: var(--color-surface-1);
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
 }
 .team-bar::before {
   content: '';
   position: absolute;
   inset: 0;
-  padding: 1px;
-  border-radius: inherit;
-  background: linear-gradient(
-    120deg,
-    color-mix(in srgb, var(--team-color) 65%, transparent) 0%,
-    transparent 38%,
-    transparent 66%,
-    color-mix(in srgb, var(--team-color) 32%, transparent) 100%
-  );
-  -webkit-mask:
-    linear-gradient(#000 0 0) content-box,
-    linear-gradient(#000 0 0);
-  mask:
-    linear-gradient(#000 0 0) content-box,
-    linear-gradient(#000 0 0);
-  -webkit-mask-composite: xor;
-  mask-composite: exclude;
-  pointer-events: none;
-}
-.team-bar::after {
-  content: '';
-  position: absolute;
-  inset: 0;
+  z-index: 0;
   background: radial-gradient(
-    ellipse 85% 160% at 0% 50%,
+    ellipse 65% 150% at 0% 50%,
     color-mix(in srgb, var(--team-color) 20%, transparent) 0%,
-    transparent 65%
+    transparent 72%
   );
   pointer-events: none;
 }
-html.low-end .team-bar {
-  background: var(--color-surface-1);
-  box-shadow: none;
-}
-html.low-end .team-bar::before,
-html.low-end .team-bar::after {
+html.low-end .team-bar::before {
   display: none;
 }
-.team-bar-content {
+.team-bar-ghost {
+  position: absolute;
+  top: 50%;
+  right: -4px;
+  transform: translateY(-52%);
+  font-family: var(--font-mono);
+  font-weight: 800;
+  font-size: 2.4rem;
+  line-height: 1;
+  color: var(--team-color);
+  opacity: 0.12;
+  pointer-events: none;
+  user-select: none;
+  z-index: 0;
+}
+.team-bar-flag {
   position: relative;
   z-index: 1;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 8px 13px;
+  flex-shrink: 0;
+  padding: 0 20px 0 13px;
+  background: color-mix(in srgb, var(--team-color) 92%, white 8%);
+  clip-path: polygon(0 0, 100% 0, calc(100% - 13px) 100%, 0 100%);
+  filter: drop-shadow(2px 0 6px rgba(0, 0, 0, 0.4));
 }
-.team-bar-label {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  min-width: 0;
+.team-bar-flag::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.3) 0%,
+    rgba(255, 255, 255, 0) 55%
+  );
+  pointer-events: none;
+}
+html.low-end .team-bar-flag {
+  filter: none;
+}
+html.low-end .team-bar-flag::after {
+  display: none;
+}
+.team-bar-flag--muted {
+  background: color-mix(in srgb, var(--team-color) 30%, var(--color-surface-2) 70%);
+}
+.team-bar-flag--muted .team-bar-name {
+  color: var(--color-ink-2);
+  text-shadow: none;
 }
 .team-bar-name {
+  position: relative;
+  z-index: 1;
   font-size: 0.68rem;
   font-weight: 800;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: color-mix(in srgb, var(--team-color) 80%, white 20%);
-  text-shadow: 0 0 16px color-mix(in srgb, var(--team-color) 45%, transparent);
+  color: rgba(8, 5, 3, 0.92);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.22);
   white-space: nowrap;
 }
-html.low-end .team-bar-name {
-  text-shadow: none;
-}
 .team-bar-count {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  margin-left: 12px;
   font-size: 0.58rem;
   font-weight: 600;
   letter-spacing: 0.05em;
-  color: var(--color-ink-2);
-  opacity: 0.75;
+  color: var(--color-ink-3);
   white-space: nowrap;
 }
 .team-bar-stat {
+  position: relative;
+  z-index: 1;
   display: flex;
   align-items: center;
   gap: 5px;
-  flex-shrink: 0;
-  padding: 3px 9px;
-  border-radius: var(--radius-sm);
+  margin-left: auto;
+  padding: 0 14px;
   font-family: var(--font-mono);
-  background: color-mix(in srgb, var(--stat-color) 12%, var(--color-surface-2));
-  border: 1px solid color-mix(in srgb, var(--stat-color) 28%, transparent);
+  flex-shrink: 0;
 }
 .team-bar-stat-value {
   font-size: 0.66rem;

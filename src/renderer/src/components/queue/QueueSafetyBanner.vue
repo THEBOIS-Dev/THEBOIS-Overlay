@@ -1,7 +1,6 @@
 <script setup lang="ts">
-import { Button } from '@renderer/components/ui/button';
 import type { QueueVerdict } from '@renderer/types/queue-safety';
-import { QUEUE_SAFETY_MESSAGE } from '@renderer/types/queue-safety';
+import { Button } from '@renderer/components/ui/button';
 import { ShieldAlert, X } from 'lucide-vue-next';
 
 defineProps<{ verdict: QueueVerdict }>();
@@ -24,7 +23,7 @@ function capitalize(text: string): string {
         />
       </div>
       <div class="min-w-0">
-        <div class="queue-safety-title">{{ QUEUE_SAFETY_MESSAGE }}</div>
+        <div class="queue-safety-title">This lobby matches your safety conditions.</div>
         <div
           v-if="verdict.reasons.length"
           class="queue-safety-reasons"

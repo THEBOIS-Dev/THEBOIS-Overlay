@@ -138,15 +138,4 @@ export default antfu(
       semi: ['error', 'always'],
     },
   },
-  {
-    files: ['**/*.ts', '**/*.vue'],
-    rules: {
-      // Only flag identifiers that are entirely uppercase letters / underscores AND have length ≥ 2
-      'id-match': [
-        'error',
-        '^(?![A-Z_]{2,}$).+$',
-        { properties: false, ignoreDestructuring: true },
-      ],
-    },
-  },
 );

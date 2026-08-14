@@ -10,6 +10,7 @@
     "@semantic-release/npm",
     "@semantic-release/release-notes-generator",
     "@vue/tsconfig",
+    "@electron/rebuild",
     "conventional-changelog-conventionalcommits",
     "tailwindcss",
     "tsx",

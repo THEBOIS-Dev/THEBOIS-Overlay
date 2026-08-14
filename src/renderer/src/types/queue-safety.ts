@@ -1,5 +1,5 @@
-import { nanoid } from '@renderer/composables/nanoid';
 import type { Player } from '@renderer/types';
+import { nanoid } from '@renderer/composables/nanoid';
 import { Column, COLUMNS, isStaff } from '@renderer/types';
 
 export type QueueMetric = Exclude<Column, Column.NAME> | 'NICKED' | 'STAFF' | 'USERNAME';
@@ -29,7 +29,7 @@ interface MetricDef {
   getValue?: (player: Player) => number;
 }
 
-const METRIC_DEFS: Record<QueueMetric, MetricDef> = {
+const defs: Record<QueueMetric, MetricDef> = {
   [Column.LEVEL]: {
     label: 'Level',
     kind: 'numeric',
@@ -133,7 +133,7 @@ const METRIC_DEFS: Record<QueueMetric, MetricDef> = {
   },
 };
 
-export const QUEUE_METRICS: QueueMetric[] = [
+export const metrics: QueueMetric[] = [
   Column.LEVEL,
   Column.FKDR,
   Column.WLR,
@@ -158,11 +158,12 @@ export interface SelectOption<T extends string | number = string> {
   label: string;
 }
 
-export const QUEUE_METRIC_OPTIONS: SelectOption<QueueMetric>[] = QUEUE_METRICS.map(
-  (metric) => ({ value: metric, label: METRIC_DEFS[metric].label }),
-);
+export const QueueMetricOptions: SelectOption<QueueMetric>[] = metrics.map((metric) => ({
+  value: metric,
+  label: defs[metric].label,
+}));
 
-export const VALUE_COMPARATOR_OPTIONS: SelectOption<ValueComparator>[] = [
+export const comparators: SelectOption<ValueComparator>[] = [
   { value: '>=', label: 'at least' },
   { value: '>', label: 'more than' },
   { value: '<=', label: 'at most' },
@@ -171,16 +172,12 @@ export const VALUE_COMPARATOR_OPTIONS: SelectOption<ValueComparator>[] = [
   { value: '!=', label: 'not' },
 ];
 
-export function metricDef(metric: QueueMetric): MetricDef {
-  return METRIC_DEFS[metric];
-}
-
 export function isBooleanMetric(metric: QueueMetric): boolean {
-  return METRIC_DEFS[metric].kind === 'boolean';
+  return defs[metric].kind === 'boolean';
 }
 
 export function isUsernameMetric(metric: QueueMetric): boolean {
-  return METRIC_DEFS[metric].kind === 'username';
+  return defs[metric].kind === 'username';
 }
 
 function usernameOf(player: Player): string {
@@ -188,7 +185,7 @@ function usernameOf(player: Player): string {
 }
 
 function comparatorLabel(comparator: ValueComparator): string {
-  return VALUE_COMPARATOR_OPTIONS.find((option) => option.value === comparator)!.label;
+  return comparators.find((option) => option.value === comparator)!.label;
 }
 
 function compareValue(
@@ -246,10 +243,7 @@ export interface QueueVerdict {
 }
 
 export function evaluateRule(rule: QueueRule, players: Player[]): RuleMatch {
-  const def = METRIC_DEFS[rule.metric];
-  // Defensive floor: a rule saved (or hand-edited) with minPlayers <= 0 would
-  // otherwise be trivially "satisfied" by zero matching players - an empty/
-  // unset condition should never read as unsafe.
+  const def = defs[rule.metric];
   const minPlayers = Math.max(1, Math.round(rule.minPlayers) || 1);
 
   if (def.kind === 'username') {
@@ -261,9 +255,6 @@ export function evaluateRule(rule: QueueRule, players: Player[]): RuleMatch {
     return {
       rule,
       matchedPlayers,
-      // A username condition matches a single specific player, not a count
-      // - "N or more" doesn't apply here the way it does for other metrics,
-      // so this is satisfied purely by presence, never by an unset value.
       satisfied: target.length > 0 && matchedPlayers.length > 0,
     };
   }
@@ -287,27 +278,8 @@ function subjectPhrase(count: number): string {
   return `${count} player${count === 1 ? '' : 's'}`;
 }
 
-export function describeRule(rule: QueueRule): string {
-  const def = METRIC_DEFS[rule.metric];
-
-  if (def.kind === 'username') {
-    const username = (rule.username ?? '').trim();
-    return username
-      ? `a player's username is exactly "${username}"`
-      : `a player's username (not yet set)`;
-  }
-
-  const subject = `${rule.minPlayers} or more player${rule.minPlayers === 1 ? '' : 's'}`;
-
-  if (def.kind === 'boolean') {
-    return `${subject} ${def.connector} ${def.label}`;
-  }
-
-  return `${subject} ${def.connector} ${def.label} ${comparatorLabel(rule.comparator)} ${rule.value}`;
-}
-
 export function describeRuleMatch(match: RuleMatch): string {
-  const def = METRIC_DEFS[match.rule.metric];
+  const def = defs[match.rule.metric];
 
   if (def.kind === 'username') {
     return `a player's username is exactly "${(match.rule.username ?? '').trim()}"`;
@@ -321,8 +293,6 @@ export function describeRuleMatch(match: RuleMatch): string {
 
   return `${subject} ${def.connector} ${def.label} ${comparatorLabel(match.rule.comparator)} ${match.rule.value}`;
 }
-
-export const QUEUE_SAFETY_MESSAGE = 'This lobby matches your safety conditions.';
 
 export function evaluateQueueSafety(
   config: QueueSafetyConfig,

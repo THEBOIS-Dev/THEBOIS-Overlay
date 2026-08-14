@@ -1,39 +1,31 @@
 <script setup lang="ts">
-import Select from '@renderer/components/queue/Select.vue';
-import Section from '@renderer/components/SettingsSection.vue';
-import { Button } from '@renderer/components/ui/button';
-import { Switch } from '@renderer/components/ui/switch';
-import { useConfigStore } from '@renderer/store/config';
-import { usePlayersStore } from '@renderer/store/players';
 import type {
   MatchMode,
   QueueMetric,
   QueueRule,
   ValueComparator,
 } from '@renderer/types/queue-safety';
+import Select from '@renderer/components/queue/Select.vue';
+import Section from '@renderer/components/SettingsSection.vue';
+import { Button } from '@renderer/components/ui/button';
+import { Switch } from '@renderer/components/ui/switch';
+import { useConfigStore } from '@renderer/store/config';
+import { usePlayersStore } from '@renderer/store/players';
 import {
+  comparators,
   createRule,
   evaluateQueueSafety,
   isBooleanMetric,
   isUsernameMetric,
-  QUEUE_METRIC_OPTIONS,
-  QUEUE_SAFETY_MESSAGE,
-  VALUE_COMPARATOR_OPTIONS,
+  QueueMetricOptions,
 } from '@renderer/types/queue-safety';
 import { Check, Plus, ShieldAlert, ShieldCheck, Trash2 } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
 
 const config = useConfigStore();
 const players = usePlayersStore();
-
 const queueSafety = computed(() => config.queueSafety);
-
 const verdict = computed(() => evaluateQueueSafety(queueSafety.value, players.players));
-
-// Rules just added via "Add condition" start out here so their row shows a
-// confirm (check) button instead of the delete bin - once the user clicks
-// it to confirm the row, it drops out of this set and behaves like any
-// other rule. Purely a local UI affordance, not persisted.
 const pendingRuleIds = ref<Set<string>>(new Set());
 
 const matchModes: { value: MatchMode; label: string; description: string }[] = [
@@ -73,14 +65,9 @@ function removeRule(ruleId: string): void {
 
 function onMetricChange(rule: QueueRule, metric: QueueMetric): void {
   rule.metric = metric;
-  // A username condition matches one specific player, not a count - lock
-  // it to 1 so a leftover count from a previous metric (e.g. "3 or more")
-  // can't silently make the rule impossible to satisfy.
   if (isUsernameMetric(metric)) rule.minPlayers = 1;
 }
 
-// Number inputs happily hold 0, negative, or empty values while the user is
-// still typing - only clamp once they're done, so we don't fight keystrokes.
 function clampMinPlayers(rule: QueueRule): void {
   const clamped = Math.min(16, Math.max(1, Math.round(rule.minPlayers) || 1));
   if (rule.minPlayers !== clamped) rule.minPlayers = clamped;
@@ -179,7 +166,7 @@ function capitalize(text: string): string {
             <Select
               class="rule-select-metric"
               :model-value="rule.metric"
-              :options="QUEUE_METRIC_OPTIONS"
+              :options="QueueMetricOptions"
               @update:model-value="(value) => onMetricChange(rule, value as QueueMetric)"
             />
 
@@ -211,7 +198,7 @@ function capitalize(text: string): string {
             <Select
               class="rule-select-metric"
               :model-value="rule.metric"
-              :options="QUEUE_METRIC_OPTIONS"
+              :options="QueueMetricOptions"
               @update:model-value="(value) => onMetricChange(rule, value as QueueMetric)"
             />
 
@@ -219,7 +206,7 @@ function capitalize(text: string): string {
               <Select
                 class="rule-select-comparator"
                 :model-value="rule.comparator"
-                :options="VALUE_COMPARATOR_OPTIONS"
+                :options="comparators"
                 @update:model-value="
                   (value) => (rule.comparator = value as ValueComparator)
                 "
@@ -293,7 +280,9 @@ function capitalize(text: string): string {
           </div>
           <div class="preview-verdict-body min-w-0">
             <span class="preview-verdict-headline">
-              <template v-if="verdict.unsafe">{{ QUEUE_SAFETY_MESSAGE }}</template>
+              <template v-if="verdict.unsafe"
+                >This lobby matches your safety conditions.</template
+              >
               <template v-else>No conditions currently match this lobby.</template>
             </span>
             <div

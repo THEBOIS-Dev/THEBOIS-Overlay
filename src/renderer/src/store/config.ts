@@ -1,9 +1,9 @@
-import { defaultPaletteId, getPalette } from '@renderer/palettes';
 import type { BedwarsMode, Interval, LogFilePreset, Network } from '@renderer/types';
-import { Column } from '@renderer/types';
 import type { QueueSafetyConfig } from '@renderer/types/queue-safety';
-import { createRule, defaultQueueSafetyConfig } from '@renderer/types/queue-safety';
 import type { PiniaPluginContext } from 'pinia';
+import { defaultPaletteId, getPalette } from '@renderer/palettes';
+import { Column } from '@renderer/types';
+import { createRule, defaultQueueSafetyConfig } from '@renderer/types/queue-safety';
 import { defineStore } from 'pinia';
 import 'pinia-plugin-persistedstate';
 
@@ -371,10 +371,6 @@ export const useConfigStore = defineStore('config', {
         store.queueSafety = {
           ...defaults,
           ...store.queueSafety,
-          // Rules saved before a field existed (e.g. `username`, added for
-          // the username-equality metric) won't have it in their persisted
-          // JSON. Re-run each through createRule's defaults so older rules
-          // can't crash evaluateRule/describeRule on a missing field.
           rules: rules.map((rule) => createRule(rule)),
           matchMode:
             store.queueSafety.matchMode === 'any' || store.queueSafety.matchMode === 'all'
