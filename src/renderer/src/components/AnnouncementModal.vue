@@ -3,8 +3,8 @@ import type {
   AlertPayload,
   ChangelogPayload,
 } from '@renderer/composables/useAnnouncements';
-import { AlertTriangle, ArrowUpCircle, Bell, Info, Wrench, X } from 'lucide-vue-next';
 import DOMPurify from 'dompurify';
+import { AlertTriangle, ArrowUpCircle, Bell, Info, Wrench, X } from 'lucide-vue-next';
 import { marked } from 'marked';
 import { computed, onMounted, ref } from 'vue';
 
@@ -103,7 +103,7 @@ onMounted(() => {
 function handleClose(): void {
   visible.value = false;
 
-  setTimeout(() => emit('close'), 300);
+  setTimeout(emit, 300, 'close');
 }
 </script>
 
@@ -139,7 +139,7 @@ function handleClose(): void {
                 ? {
                     color: currentAlertMeta.color,
                     background: currentAlertMeta.glow.replace('0.28', '0.12'),
-                    borderColor: currentAlertMeta.color + '55',
+                    borderColor: `${currentAlertMeta.color}55`,
                     boxShadow: `0 0 14px ${currentAlertMeta.glow}`,
                   }
                 : {}

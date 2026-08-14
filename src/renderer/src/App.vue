@@ -125,11 +125,13 @@ const {
   errorMessage: discordLinkError,
   refreshStatus: refreshDiscordLinkStatus,
   startLink: startDiscordLink,
+  bypassLink: bypassDiscordLink,
   handleTelemetryEvent,
 } = useTelemetryAuth();
 
 const skipLoading = localStorage.getItem('skip-loading') === '1';
 const skipAnnouncements = localStorage.getItem('skip-announcements') === '1';
+const skipDiscordLink = localStorage.getItem('skip-discord-link') === '1';
 
 const loadingDone = ref(skipLoading);
 const appVisible = ref(skipLoading);
@@ -968,7 +970,13 @@ onMounted(async () => {
   attachLogListener();
   attachProxyListener();
   attachTelemetryListener();
-  await refreshDiscordLinkStatus();
+
+  if (skipDiscordLink) {
+    bypassDiscordLink();
+  } else {
+    await refreshDiscordLinkStatus();
+  }
+
   updateRpcEnabled();
 
   await initLogWatcher();

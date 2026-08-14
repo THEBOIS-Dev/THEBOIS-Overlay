@@ -30,6 +30,13 @@ function startLink(): void {
   window.api.telemetry.startLink();
 }
 
+function bypassLink(): void {
+  errorMessage.value = '';
+  linking.value = false;
+  linked.value = true;
+  checked.value = true;
+}
+
 function handleTelemetryEvent(event: TelemetryEventPayload): void {
   if (event.type === 'linking') {
     linking.value = true;
@@ -57,6 +64,7 @@ export function useTelemetryAuth() {
     needsLink,
     refreshStatus,
     startLink,
+    bypassLink,
     handleTelemetryEvent,
   };
 }

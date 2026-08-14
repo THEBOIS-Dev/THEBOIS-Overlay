@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref, watch, computed } from 'vue';
-import { SliderRoot, SliderTrack, SliderRange, SliderThumb } from 'radix-vue';
+import { SliderRange, SliderRoot, SliderThumb, SliderTrack } from 'radix-vue';
+import { computed, ref, watch } from 'vue';
 
 const props = defineProps<{
   label: string;

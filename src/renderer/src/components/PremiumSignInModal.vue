@@ -61,7 +61,7 @@ function handleCopy(): void {
 function handleClose(): void {
   visible.value = false;
 
-  setTimeout(() => emit('close'), 300);
+  setTimeout(emit, 300, 'close');
 }
 
 onMounted(() => {

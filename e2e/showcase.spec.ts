@@ -157,6 +157,7 @@ async function captureShowcase(
         localStorage.setItem('skip-loading', '1');
         localStorage.setItem('skip-announcements', '1');
         localStorage.setItem('skip-remove-btn', '1');
+        localStorage.setItem('skip-discord-link', '1');
       },
       { cfg: configSeed, nicks },
     );
