@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import type { ThemeColors } from '@renderer/store/config';
 import type { ProxyEventPayload } from '@renderer/types';
-import AnnouncementModal from '@renderer/components/AnnouncementModal.vue';
-import DiscordLinkModal from '@renderer/components/DiscordLinkModal.vue';
 import LoadingScreen from '@renderer/components/LoadingScreen.vue';
+import AnnouncementModal from '@renderer/components/modals/AnnouncementModal.vue';
+import DiscordLinkModal from '@renderer/components/modals/DiscordLinkModal.vue';
+import PremiumSignInModal from '@renderer/components/modals/PremiumSignInModal.vue';
 import PerfOverlay from '@renderer/components/PerfOverlay.vue';
-import PremiumSignInModal from '@renderer/components/PremiumSignInModal.vue';
 import QueueSafetyBanner from '@renderer/components/queue/QueueSafetyBanner.vue';
 import TitleBar from '@renderer/components/TitleBar.vue';
 import { useAnnouncements } from '@renderer/composables/useAnnouncements';

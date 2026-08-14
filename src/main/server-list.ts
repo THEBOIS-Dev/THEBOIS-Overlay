@@ -1,8 +1,21 @@
+import type {
+  NBT,
+  Byte as NbtByte,
+  String as NbtString,
+  Tags,
+  TagType,
+} from 'prismarine-nbt';
 import { promises as fs } from 'node:fs';
-import * as path from 'node:path';
-import * as nbt from 'prismarine-nbt';
+import { dirname, join } from 'node:path';
+import { parseUncompressed, writeUncompressed } from 'prismarine-nbt';
+import { fetchRemoteServerStatus } from './mc-status';
+import {
+  dynamicScanRoots,
+  scanForServersDatFiles,
+  verifyServersDatFile,
+} from './server-list-scan';
 
-type ServerFields = Record<string, nbt.Tags[nbt.TagType]>;
+type ServerFields = Record<string, Tags[TagType]>;
 
 interface PromoteTarget {
   clientRoot: string;
@@ -13,13 +26,15 @@ interface PromoteSpec {
   entryName: string;
   targetIp: string;
   matchIpHints: RegExp[];
+  sourceHost: string;
+  sourcePort: number;
 }
 
-function stringTag(value: string): nbt.String {
+function stringTag(value: string): NbtString {
   return { type: 'string', value };
 }
 
-function byteTag(value: number): nbt.Byte {
+function byteTag(value: number): NbtByte {
   return { type: 'byte', value };
 }
 
@@ -28,7 +43,7 @@ function readStringField(entry: ServerFields, key: string): string | undefined {
   return field !== undefined && field.type === 'string' ? field.value : undefined;
 }
 
-function buildEmptyRoot(): nbt.NBT {
+function buildEmptyRoot(): NBT {
   return {
     name: '',
     type: 'compound',
@@ -41,24 +56,24 @@ function buildEmptyRoot(): nbt.NBT {
   };
 }
 
-async function readServersDat(filePath: string): Promise<nbt.NBT> {
+async function readServersDat(filePath: string): Promise<NBT> {
   try {
     const buf = await fs.readFile(filePath);
     if (buf.length === 0) return buildEmptyRoot();
-    return nbt.parseUncompressed(buf, 'big');
+    return parseUncompressed(buf, 'big');
   } catch {
     return buildEmptyRoot();
   }
 }
 
-async function writeServersDat(filePath: string, root: nbt.NBT): Promise<void> {
-  const buf = nbt.writeUncompressed(root, 'big');
+async function writeServersDat(filePath: string, root: NBT): Promise<void> {
+  const buf = writeUncompressed(root, 'big');
   const tmpPath = `${filePath}.kyra-tmp`;
   await fs.writeFile(tmpPath, buf);
   await fs.rename(tmpPath, filePath);
 }
 
-function getServerEntries(root: nbt.NBT): ServerFields[] {
+function getServerEntries(root: NBT): ServerFields[] {
   const serversTag = root.value.servers;
   if (!serversTag || serversTag.type !== 'list') return [];
   const listValue = serversTag.value as { type: string; value: unknown[] };
@@ -66,7 +81,7 @@ function getServerEntries(root: nbt.NBT): ServerFields[] {
   return listValue.value as ServerFields[];
 }
 
-function setServerEntries(root: nbt.NBT, entries: ServerFields[]): nbt.NBT {
+function setServerEntries(root: NBT, entries: ServerFields[]): NBT {
   return {
     ...root,
     value: {
@@ -91,36 +106,46 @@ function findExistingIcon(entries: ServerFields[], hints: RegExp[]): string | un
   return undefined;
 }
 
-function upsertAllPromotedEntries(
+async function resolveEntryIcon(
+  spec: PromoteSpec,
+  existingIcon: Tags[TagType] | undefined,
+  remaining: ServerFields[],
+): Promise<NbtString | Tags[TagType] | undefined> {
+  const liveStatus = await fetchRemoteServerStatus(spec.sourceHost, spec.sourcePort);
+  if (liveStatus?.favicon !== undefined) return stringTag(liveStatus.favicon);
+
+  if (existingIcon !== undefined) return existingIcon;
+
+  const borrowedIcon = findExistingIcon(remaining, spec.matchIpHints);
+  return borrowedIcon !== undefined ? stringTag(borrowedIcon) : undefined;
+}
+
+async function upsertAllPromotedEntries(
   entries: ServerFields[],
   specs: PromoteSpec[],
-): ServerFields[] {
+): Promise<ServerFields[]> {
   const specNames = new Set(specs.map((spec) => spec.entryName));
 
   const remaining = entries.filter(
     (entry) => !specNames.has(readStringField(entry, 'name') ?? ''),
   );
 
-  const promotedBlock = specs.map((spec) => {
-    const existing = entries.find(
-      (entry) => readStringField(entry, 'name') === spec.entryName,
-    );
+  const promotedBlock = await Promise.all(
+    specs.map(async (spec) => {
+      const existing = entries.find(
+        (entry) => readStringField(entry, 'name') === spec.entryName,
+      );
 
-    const existingIcon = existing?.icon;
-    const borrowedIcon =
-      existingIcon === undefined
-        ? findExistingIcon(remaining, spec.matchIpHints)
-        : undefined;
-    const icon =
-      existingIcon ?? (borrowedIcon !== undefined ? stringTag(borrowedIcon) : undefined);
+      const icon = await resolveEntryIcon(spec, existing?.icon, remaining);
 
-    return {
-      name: stringTag(spec.entryName),
-      ip: stringTag(spec.targetIp),
-      acceptTextures: byteTag(1),
-      ...(icon ? { icon } : {}),
-    };
-  });
+      return {
+        name: stringTag(spec.entryName),
+        ip: stringTag(spec.targetIp),
+        acceptTextures: byteTag(1),
+        ...(icon ? { icon } : {}),
+      };
+    }),
+  );
 
   return [...promotedBlock, ...remaining];
 }
@@ -139,7 +164,7 @@ async function promoteInFile(filePath: string, specs: PromoteSpec[]): Promise<bo
 
     if (alreadyCorrect) return true;
 
-    const updated = upsertAllPromotedEntries(entries, specs);
+    const updated = await upsertAllPromotedEntries(entries, specs);
     await writeServersDat(filePath, setServerEntries(root, updated));
     return true;
   } catch {
@@ -229,7 +254,7 @@ async function expandLunarVersionRoots(base: string): Promise<string[]> {
     const paths: string[] = [];
 
     for (const version of versions) {
-      const candidate = path.join(base, version, 'servers.dat');
+      const candidate = join(base, version, 'servers.dat');
 
       try {
         await fs.access(candidate);
@@ -270,14 +295,27 @@ async function collectServersDatPaths(
 
   for (const candidatePath of direct) {
     try {
-      await fs.access(path.dirname(candidatePath));
+      await fs.access(dirname(candidatePath));
       existing.push(candidatePath);
     } catch {
       continue;
     }
   }
 
-  return Array.from(new Set([...existing, ...lunarExpanded.flat()]));
+  const knownPaths = new Set([...existing, ...lunarExpanded.flat()]);
+
+  const discoveredCandidates = await scanForServersDatFiles(
+    dynamicScanRoots(platform, appData, home),
+  );
+
+  const verifiedDiscovered: string[] = [];
+
+  for (const candidate of discoveredCandidates) {
+    if (knownPaths.has(candidate)) continue;
+    if (await verifyServersDatFile(candidate)) verifiedDiscovered.push(candidate);
+  }
+
+  return Array.from(new Set([...knownPaths, ...verifiedDiscovered]));
 }
 
 export async function promoteProxyAcrossClients(

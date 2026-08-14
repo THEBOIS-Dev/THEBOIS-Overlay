@@ -1,6 +1,6 @@
 import { Buffer } from 'node:buffer';
 import { promises as fs } from 'node:fs';
-import * as path from 'node:path';
+import { dirname, join } from 'node:path';
 import { app, safeStorage, shell } from 'electron';
 import { dbg } from './logger';
 import { getMainWindow } from './window';
@@ -27,14 +27,14 @@ let activePollToken = 0;
 
 function getStatePath(): string {
   if (statePath === null) {
-    statePath = path.join(app.getPath('userData'), 'telemetry.enc');
+    statePath = join(app.getPath('userData'), 'telemetry.enc');
   }
   return statePath;
 }
 
 function getLegacyStatePath(): string {
   if (legacyStatePath === null) {
-    legacyStatePath = path.join(app.getPath('userData'), 'telemetry.json');
+    legacyStatePath = join(app.getPath('userData'), 'telemetry.json');
   }
   return legacyStatePath;
 }
@@ -98,7 +98,7 @@ async function saveState(state: TelemetryState): Promise<void> {
     ? safeStorage.encryptString(json)
     : Buffer.from(json, 'utf8');
 
-  await fs.mkdir(path.dirname(target), { recursive: true, mode: 0o700 });
+  await fs.mkdir(dirname(target), { recursive: true, mode: 0o700 });
   await fs.writeFile(tmpPath, data, { mode: 0o600 });
   await fs.rename(tmpPath, target);
 }

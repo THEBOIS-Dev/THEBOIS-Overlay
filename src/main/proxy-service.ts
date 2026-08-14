@@ -2,7 +2,7 @@ import type { ProxyBindHost, ProxyEvent } from './proxy';
 import process from 'node:process';
 import { app } from 'electron';
 import { dbg } from './logger';
-import { ProxyManager } from './proxy';
+import { endpoints, ProxyManager } from './proxy';
 import { promoteProxyAcrossClients } from './server-list';
 import { getMainWindow } from './window';
 
@@ -49,11 +49,15 @@ export function runProxyPromotion(): void {
           entryName: 'Kyra Proxy | PikaNetwork',
           targetIp: `localhost:${status.pika.port}`,
           matchIpHints: [/pika/i],
+          sourceHost: endpoints.pikanetwork.host,
+          sourcePort: endpoints.pikanetwork.port,
         },
         {
           entryName: 'Kyra Proxy | JartexNetwork',
           targetIp: `localhost:${status.jartex.port}`,
           matchIpHints: [/jartex/i],
+          sourceHost: endpoints.jartexnetwork.host,
+          sourcePort: endpoints.jartexnetwork.port,
         },
       ],
     ).catch((error: Error) =>

@@ -1,4 +1,4 @@
-import * as nbt from 'prismarine-nbt';
+import { simplify } from 'prismarine-nbt';
 
 const byteToHex: Record<number, string> = {
   0: '#000000',
@@ -82,7 +82,7 @@ function isNbtTag(value: unknown): value is { type: string; value: unknown } {
 function simplifyIfNbt(value: unknown): unknown {
   if (isNbtTag(value)) {
     try {
-      return nbt.simplify(value as never);
+      return simplify(value as never);
     } catch {
       return value;
     }
@@ -133,6 +133,32 @@ export function extractComponentText(component: unknown): string {
 
 export function parseChatToPlain(raw: unknown): string {
   return stripColorCodes(extractComponentText(raw));
+}
+
+export type ChatComponent = { text?: string; extra?: unknown[] } | string;
+
+export function normalizeChatComponent(raw: unknown): ChatComponent {
+  if (isNbtTag(raw)) {
+    return normalizeChatComponent(simplifyIfNbt(raw));
+  }
+
+  if (typeof raw === 'string') {
+    try {
+      return normalizeChatComponent(JSON.parse(raw) as unknown);
+    } catch {
+      return raw;
+    }
+  }
+
+  if (Array.isArray(raw)) {
+    return { text: '', extra: raw };
+  }
+
+  if (typeof raw === 'object' && raw !== null) {
+    return raw;
+  }
+
+  return '';
 }
 
 function extractSectionColor(text: string): string | null {

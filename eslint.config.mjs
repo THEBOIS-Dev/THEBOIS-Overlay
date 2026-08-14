@@ -45,10 +45,17 @@ export default antfu(
       'ts/await-thenable': 'error',
       'ts/no-require-imports': 'warn',
       'ts/no-import-type-side-effects': 'error',
+      'ts/no-namespace': 'error',
       'no-console': [
         'warn',
         {
           allow: ['warn', 'error'],
+        },
+      ],
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: 'ImportNamespaceSpecifier',
         },
       ],
       'prefer-const': 'error',

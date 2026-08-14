@@ -154,8 +154,14 @@ onUnmounted(() => {
             class="open-btn"
             @click="handleOpen"
           >
-            <ExternalLink :size="14" />
-            Open Sign-In Page
+            <span class="open-btn-content">
+              <ExternalLink
+                :size="14"
+                class="open-btn-icon"
+                aria-hidden="true"
+              />
+              <span class="open-btn-label">Open Sign-In Page</span>
+            </span>
           </button>
 
           <div class="status-row">
@@ -427,15 +433,12 @@ html.low-end .card {
 }
 
 .open-btn {
+  width: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 7px;
   padding: 9px 14px;
   border-radius: 9px;
-  font-size: 12.5px;
-  font-weight: 600;
-  letter-spacing: 0.02em;
   color: var(--color-accent-light);
   background: rgba(var(--color-accent-rgb), 0.16);
   border: 1px solid rgba(var(--color-accent-rgb), 0.35);
@@ -445,6 +448,32 @@ html.low-end .card {
     border-color 0.14s,
     color 0.14s,
     box-shadow 0.14s;
+}
+
+.open-btn-content {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  line-height: 1;
+}
+
+.open-btn-icon {
+  display: block;
+  position: relative;
+  top: -1.5px;
+  flex-shrink: 0;
+}
+
+.open-btn-label {
+  display: block;
+  position: relative;
+  top: 1px;
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
 }
 
 .open-btn:hover {

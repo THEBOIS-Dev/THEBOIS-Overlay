@@ -1,5 +1,5 @@
 import { promises as fs } from 'node:fs';
-import * as path from 'node:path';
+import { join } from 'node:path';
 import { app, contentTracing, ipcMain, shell } from 'electron';
 import { dbg } from '../logger';
 import {
@@ -13,7 +13,7 @@ import {
 let tracing = false;
 
 function getPerfLogDir(): string {
-  return path.join(app.getPath('userData'), 'perf-logs');
+  return join(app.getPath('userData'), 'perf-logs');
 }
 
 async function writeDump(rendererSnapshot: unknown): Promise<string> {
@@ -21,7 +21,7 @@ async function writeDump(rendererSnapshot: unknown): Promise<string> {
   await fs.mkdir(dir, { recursive: true });
 
   const filename = `session-${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
-  const target = path.join(dir, filename);
+  const target = join(dir, filename);
 
   const payload = {
     generatedAt: new Date().toISOString(),
@@ -68,7 +68,7 @@ export function registerPerfHandlers(): void {
     tracing = false;
     const dir = getPerfLogDir();
     await fs.mkdir(dir, { recursive: true });
-    const target = path.join(
+    const target = join(
       dir,
       `trace-${new Date().toISOString().replace(/[:.]/g, '-')}.json`,
     );

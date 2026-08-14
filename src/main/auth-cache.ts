@@ -1,6 +1,6 @@
 import { Buffer } from 'node:buffer';
 import { promises as fs } from 'node:fs';
-import * as path from 'node:path';
+import { dirname, join } from 'node:path';
 import { safeStorage } from 'electron';
 
 interface CachePayload {
@@ -67,7 +67,7 @@ export class EncryptedFileCache {
       ? safeStorage.encryptString(json)
       : Buffer.from(json, 'utf8');
 
-    await fs.mkdir(path.dirname(this.filePath), { recursive: true, mode: 0o700 });
+    await fs.mkdir(dirname(this.filePath), { recursive: true, mode: 0o700 });
     await fs.writeFile(this.filePath, data, { mode: 0o600 });
   }
 }
@@ -75,8 +75,7 @@ export class EncryptedFileCache {
 export function createEncryptedAuthCache(
   cacheDir: string,
 ): (params: { cacheName: string; username: string }) => EncryptedFileCache {
-  return ({ cacheName }) =>
-    new EncryptedFileCache(path.join(cacheDir, `${cacheName}.cache`));
+  return ({ cacheName }) => new EncryptedFileCache(join(cacheDir, `${cacheName}.cache`));
 }
 
 export async function purgeLegacyPlaintextCache(cacheDir: string): Promise<void> {
@@ -91,6 +90,6 @@ export async function purgeLegacyPlaintextCache(cacheDir: string): Promise<void>
   await Promise.all(
     entries
       .filter((name) => name.endsWith('-cache.json'))
-      .map(async (name) => fs.unlink(path.join(cacheDir, name)).catch(() => undefined)),
+      .map(async (name) => fs.unlink(join(cacheDir, name)).catch(() => undefined)),
   );
 }

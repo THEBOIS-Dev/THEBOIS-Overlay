@@ -17,9 +17,27 @@ import {
   parseChatToPlain,
   stripColorCodes,
 } from './chat-color-utils';
+import { fetchRemoteServerStatus } from './mc-status';
 
 export type ProxyNetwork = 'pikanetwork' | 'jartexnetwork';
 export type ProxyBindHost = '0.0.0.0' | '127.0.0.1';
+
+export interface RemoteEndpoint {
+  host: string;
+  port: number;
+}
+
+interface PingResponse {
+  version: { name: string; protocol: number };
+  players: { max: number; online: number; sample: unknown[] };
+  description: { text?: string; extra?: unknown[] } | string;
+  favicon?: string;
+}
+
+export const endpoints: Record<ProxyNetwork, RemoteEndpoint> = {
+  pikanetwork: { host: 'pika.host', port: 25565 },
+  jartexnetwork: { host: 'play.jartex.fun', port: 25565 },
+};
 
 export interface TeamInfo {
   name: string;
@@ -186,6 +204,25 @@ export class BedwarsProxy extends EventEmitter {
         motd: `Kyra | ${this.network === 'pikanetwork' ? 'PikaNetwork' : 'JartexNetwork'}`,
         maxPlayers: 5,
         hideErrors: false,
+        beforePing: (
+          response: PingResponse,
+          _client: unknown,
+          callback: (error: unknown, result: PingResponse) => void,
+        ) => {
+          void fetchRemoteServerStatus(this.remoteHost, this.remotePort).then(
+            (status) => {
+              if (!status) {
+                callback(null, response);
+                return;
+              }
+              callback(null, {
+                ...response,
+                description: status.description,
+                favicon: status.favicon ?? response.favicon,
+              });
+            },
+          );
+        },
         beforeLogin: (client: McClient) => {
           client.once('login_acknowledged', () => {
             const write = client.write.bind(client);
@@ -734,11 +771,17 @@ export class ProxyManager extends EventEmitter {
 
   constructor(pikaPort: number, jartexPort: number, bindHost: ProxyBindHost) {
     super();
-    this.pika = new BedwarsProxy('pikanetwork', 'pika.host', 25565, pikaPort, bindHost);
+    this.pika = new BedwarsProxy(
+      'pikanetwork',
+      endpoints.pikanetwork.host,
+      endpoints.pikanetwork.port,
+      pikaPort,
+      bindHost,
+    );
     this.jartex = new BedwarsProxy(
       'jartexnetwork',
-      'play.jartex.fun',
-      25565,
+      endpoints.jartexnetwork.host,
+      endpoints.jartexnetwork.port,
       jartexPort,
       bindHost,
     );

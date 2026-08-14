@@ -4,11 +4,11 @@
 
 <br/>
 
-<img src="https://raw.githubusercontent.com/THEBOIS-Dev/THEBOIS-Overlay/main/resources/icon.png" width="64" alt="icon" />
+<img src="https://raw.githubusercontent.com/kyizl/kyra/main/resources/icon.png" width="64" alt="icon" />
 
 <br/><br/>
 
-<a href="https://github.com/THEBOIS-Dev/THEBOIS-Overlay/releases/latest"><img src="https://img.shields.io/badge/Release-2B2036?style=for-the-badge&logo=github&logoColor=F5C2E7&labelColor=2B2036" alt="latest release" /></a>
+<a href="https://github.com/kyizl/kyra/releases/latest"><img src="https://img.shields.io/badge/Release-2B2036?style=for-the-badge&logo=github&logoColor=F5C2E7&labelColor=2B2036" alt="latest release" /></a>
 <a href="LICENSE"><img src="https://img.shields.io/badge/License-GPL--3.0-3E335A?style=for-the-badge&logo=gnu&logoColor=F5C2E7&labelColor=2B2036" alt="license" /></a>
 
 <br/><br/>
