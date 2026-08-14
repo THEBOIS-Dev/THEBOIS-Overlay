@@ -4,6 +4,11 @@ import { is } from '@electron-toolkit/utils';
 import { BrowserWindow, screen } from 'electron';
 import windowStateKeeper from 'electron-window-state';
 
+const iconFileName = process.platform === 'win32' ? 'icon.ico' : 'icon.png';
+const iconPath = is.dev
+  ? join(__dirname, '../../resources', iconFileName)
+  : join(process.resourcesPath, 'resources', iconFileName);
+
 const width = 700;
 const height = 460;
 const minWidth = 480;
@@ -40,6 +45,7 @@ export function createWindow(): BrowserWindow {
 
   const win = new BrowserWindow({
     title: 'Kyra Overlay',
+    icon: iconPath,
     width: state.width,
     height: state.height,
     x: state.x,
