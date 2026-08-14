@@ -1,0 +1,9 @@
+name = "overlay-alert-worker"
+main = "src/index.ts"
+compatibility_date = "2025-01-01"
+
+route = { pattern = "overlay.kyizl.is-a.dev", custom_domain = true }
+
+[[kv_namespaces]]
+binding = "ALERTS_KV"
+id = "33b52cb079df450e9887b1a9ae08ba24"
