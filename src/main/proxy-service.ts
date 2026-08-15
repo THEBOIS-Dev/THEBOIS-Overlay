@@ -1,7 +1,7 @@
-import type { ProxyBindHost, ProxyEvent } from './proxy';
-import process from 'node:process';
 import { app } from 'electron';
+import process from 'node:process';
 import { dbg } from './logger';
+import type { ProxyBindHost, ProxyEvent } from './proxy';
 import { endpoints, ProxyManager } from './proxy';
 import { promoteProxyAcrossClients } from './server-list';
 import { getMainWindow } from './window';

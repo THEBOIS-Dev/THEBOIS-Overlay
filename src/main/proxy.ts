@@ -1,12 +1,11 @@
 import type { ClientOptions } from 'minecraft-protocol';
+import { createClient, createServer, states } from 'minecraft-protocol';
 import type { Buffer } from 'node:buffer';
-import type { Socket } from 'node:net';
-import type { McClient, McPacketMeta, McServer } from './mc-protocol-types';
 import { EventEmitter } from 'node:events';
+import type { Socket } from 'node:net';
 import { connect } from 'node:net';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import { createClient, createServer, states } from 'minecraft-protocol';
 import { createEncryptedAuthCache, purgeLegacyPlaintextCache } from './auth-cache';
 import {
   extractComponentText,
@@ -17,6 +16,7 @@ import {
   parseChatToPlain,
   stripColorCodes,
 } from './chat-color-utils';
+import type { McClient, McPacketMeta, McServer } from './mc-protocol-types';
 import { fetchRemoteServerStatus } from './mc-status';
 
 export type ProxyNetwork = 'pikanetwork' | 'jartexnetwork';
@@ -203,6 +203,7 @@ export class BedwarsProxy extends EventEmitter {
         version: false,
         motd: `Kyra | ${this.network === 'pikanetwork' ? 'PikaNetwork' : 'JartexNetwork'}`,
         maxPlayers: 5,
+        keepAlive: false,
         hideErrors: false,
         beforePing: (
           response: PingResponse,
@@ -318,6 +319,7 @@ export class BedwarsProxy extends EventEmitter {
         const pendingUpstreamBuffers: Buffer[] = [];
         const pendingConfigurationBuffers: Buffer[] = [];
         let configurationReady = false;
+        let awaitingConfigurationAcknowledgement = false;
         const flushConfiguration = (): void => {
           if (!configurationReady) return;
           for (const buffer of pendingConfigurationBuffers.splice(0)) {
@@ -343,6 +345,17 @@ export class BedwarsProxy extends EventEmitter {
           }
           server.off('playerJoin', flushUpstreamBuffers);
         };
+        const enterConfigurationState = (): void => {
+          awaitingConfigurationAcknowledgement = true;
+          client.once('configuration_acknowledged', () => {
+            awaitingConfigurationAcknowledgement = false;
+            client.state = states.CONFIGURATION;
+            client.once('finish_configuration', () => {
+              client.state = states.PLAY;
+              flushUpstreamBuffers(client);
+            });
+          });
+        };
         server.on('playerJoin', flushUpstreamBuffers);
         const flushPendingClientBuffers = (): void => {
           if (!upstreamReady || !activeUpstream || pendingClientBuffers.length === 0)
@@ -356,9 +369,34 @@ export class BedwarsProxy extends EventEmitter {
           }
           pendingClientBuffers.length = 0;
         };
+        const relayClientBuffer = (buffer: Buffer): void => {
+          if (
+            client.state !== states.PLAY ||
+            awaitingConfigurationAcknowledgement ||
+            !activeUpstream
+          )
+            return;
+          if (!upstreamReady) {
+            pendingClientBuffers.push(buffer);
+            return;
+          }
+          if (!activeUpstream.ended) {
+            try {
+              activeUpstream.writeRaw(buffer);
+            } catch {}
+          }
+        };
+        const clientInternals = client as unknown as {
+          decompressor?: NodeJS.EventEmitter;
+          splitter: NodeJS.EventEmitter;
+        };
+        const clientPacketStream =
+          clientInternals.decompressor ?? clientInternals.splitter;
+        clientPacketStream.prependListener('data', relayClientBuffer);
         const teardown = (): void => {
           if (sessionEnded) return;
           sessionEnded = true;
+          clientPacketStream.off('data', relayClientBuffer);
           server.off('playerJoin', flushUpstreamBuffers);
           this.sessions.delete(sessionKey);
           this.emitProxyEvent({
@@ -462,33 +500,45 @@ export class BedwarsProxy extends EventEmitter {
               }
             }, 15_000);
           });
-          (upstream as NodeJS.EventEmitter).on(
-            'raw',
-            (buffer: Buffer, meta: McPacketMeta) => {
-              if (upstream !== activeUpstream || meta.state !== states.PLAY) return;
-              if (meta.name === 'login') {
-                upstreamReady = true;
-                clearTimeout(connectTimeout);
-              }
-              if (!client.ended && client.state === states.PLAY) {
-                try {
-                  client.writeRaw(buffer);
-                } catch {}
-              } else {
-                pendingUpstreamBuffers.push(buffer);
-              }
-            },
-          );
+          let upstreamPacketStream: NodeJS.EventEmitter | null = null;
+          const relayUpstreamBuffer = (buffer: Buffer): void => {
+            if (upstream !== activeUpstream) return;
+            if (upstream.state === states.CONFIGURATION) {
+              pendingConfigurationBuffers.push(buffer);
+              flushConfiguration();
+            }
+            if (upstream.state !== states.PLAY) return;
+            if (!client.ended && client.state === states.PLAY) {
+              try {
+                client.writeRaw(buffer);
+              } catch {}
+            } else {
+              pendingUpstreamBuffers.push(buffer);
+            }
+          };
+          (upstream as NodeJS.EventEmitter).on('state', (state: string) => {
+            if (
+              upstreamPacketStream ||
+              (state !== states.CONFIGURATION && state !== states.PLAY)
+            )
+              return;
+            const internals = upstream as unknown as {
+              decompressor?: NodeJS.EventEmitter;
+              splitter: NodeJS.EventEmitter;
+            };
+            upstreamPacketStream = internals.decompressor ?? internals.splitter;
+            upstreamPacketStream.prependListener('data', relayUpstreamBuffer);
+          });
           (upstream as NodeJS.EventEmitter).on(
             'packet',
-            (data: Record<string, unknown>, meta: McPacketMeta, buffer: Buffer) => {
+            (data: Record<string, unknown>, meta: McPacketMeta) => {
               if (upstream !== activeUpstream) return;
-              if (meta.state === states.CONFIGURATION) {
-                pendingConfigurationBuffers.push(buffer);
-                flushConfiguration();
+              if (meta.state === states.CONFIGURATION) return;
+              if (meta.state !== states.PLAY) return;
+              if (meta.name === 'start_configuration') {
+                enterConfigurationState();
                 return;
               }
-              if (meta.state !== states.PLAY) return;
               if (meta.name === 'login') {
                 upstreamReady = true;
                 clearTimeout(connectTimeout);
@@ -547,6 +597,11 @@ export class BedwarsProxy extends EventEmitter {
               clearTimeout(connectTimeout);
               if (abandoned || upstream !== activeUpstream) return;
               if (
+                upstreamReady &&
+                error.message.startsWith('Parse error for play.toClient:')
+              )
+                return;
+              if (
                 !upstreamReady &&
                 isRetryableError(error) &&
                 attempt < 4 &&
@@ -597,17 +652,26 @@ export class BedwarsProxy extends EventEmitter {
         };
         void connectUpstream(false);
         (client as NodeJS.EventEmitter).on(
-          'raw',
-          (buffer: Buffer, meta: McPacketMeta) => {
-            if (meta.state !== states.PLAY || !activeUpstream) return;
-            if (!upstreamReady) {
-              pendingClientBuffers.push(buffer);
-              return;
-            }
-            if (!activeUpstream.ended) {
-              try {
-                activeUpstream.writeRaw(buffer);
-              } catch {}
+          'packet',
+          (
+            _data: Record<string, unknown>,
+            meta: McPacketMeta,
+            _buffer: Buffer,
+            fullBuffer: Buffer,
+          ) => {
+            if (!activeUpstream) return;
+            if (meta.state === states.CONFIGURATION) {
+              if (
+                meta.name !== 'finish_configuration' &&
+                meta.name !== 'select_known_packs' &&
+                meta.name !== 'accept_code_of_conduct' &&
+                activeUpstream.state === states.CONFIGURATION &&
+                !activeUpstream.ended
+              ) {
+                try {
+                  activeUpstream.writeRaw(fullBuffer);
+                } catch {}
+              }
             }
           },
         );
