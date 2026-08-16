@@ -8,7 +8,7 @@ import type {
 import { promises as fs } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { parseUncompressed, writeUncompressed } from 'prismarine-nbt';
-import { fetchRemoteServerStatus } from './mc-status';
+import { fetchRemoteServerStatus, uri } from './mc-status';
 import {
   dynamicScanRoots,
   scanForServersDatFiles,
@@ -28,6 +28,11 @@ interface PromoteSpec {
   matchIpHints: RegExp[];
   sourceHost: string;
   sourcePort: number;
+}
+
+function sanitizeFavicon(value: string): string {
+  const match = value.match(uri);
+  return match ? match[1] : value;
 }
 
 function stringTag(value: string): NbtString {
@@ -100,7 +105,8 @@ function findExistingIcon(entries: ServerFields[], hints: RegExp[]): string | un
     const name = readStringField(entry, 'name') ?? '';
     if (hints.some((hint) => hint.test(ip) || hint.test(name))) {
       const icon = entry.icon;
-      if (icon !== undefined && icon.type === 'string') return icon.value;
+      if (icon !== undefined && icon.type === 'string')
+        return sanitizeFavicon(icon.value);
     }
   }
   return undefined;
@@ -114,7 +120,11 @@ async function resolveEntryIcon(
   const liveStatus = await fetchRemoteServerStatus(spec.sourceHost, spec.sourcePort);
   if (liveStatus?.favicon !== undefined) return stringTag(liveStatus.favicon);
 
-  if (existingIcon !== undefined) return existingIcon;
+  if (existingIcon !== undefined) {
+    if (existingIcon.type === 'string')
+      return stringTag(sanitizeFavicon(existingIcon.value));
+    return existingIcon;
+  }
 
   const borrowedIcon = findExistingIcon(remaining, spec.matchIpHints);
   return borrowedIcon !== undefined ? stringTag(borrowedIcon) : undefined;
@@ -155,12 +165,17 @@ async function promoteInFile(filePath: string, specs: PromoteSpec[]): Promise<bo
     const root = await readServersDat(filePath);
     const entries = getServerEntries(root);
 
-    const alreadyCorrect = specs.every(
-      (spec, i) =>
-        entries[i] !== undefined &&
-        readStringField(entries[i], 'name') === spec.entryName &&
-        readStringField(entries[i], 'ip') === spec.targetIp,
-    );
+    const alreadyCorrect = specs.every((spec, i) => {
+      const entry = entries[i];
+      if (entry === undefined) return false;
+      if (readStringField(entry, 'name') !== spec.entryName) return false;
+      if (readStringField(entry, 'ip') !== spec.targetIp) return false;
+      const icon = entry.icon;
+      if (icon !== undefined && icon.type === 'string' && uri.test(icon.value)) {
+        return false;
+      }
+      return true;
+    });
 
     if (alreadyCorrect) return true;
 

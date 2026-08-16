@@ -1,11 +1,12 @@
 import type { ClientOptions } from 'minecraft-protocol';
-import { createClient, createServer, states } from 'minecraft-protocol';
 import type { Buffer } from 'node:buffer';
-import { EventEmitter } from 'node:events';
 import type { Socket } from 'node:net';
+import type { McClient, McPacketMeta, McServer } from './mc-protocol-types';
+import { EventEmitter } from 'node:events';
 import { connect } from 'node:net';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
+import { createClient, createServer, states } from 'minecraft-protocol';
 import { createEncryptedAuthCache, purgeLegacyPlaintextCache } from './auth-cache';
 import {
   extractComponentText,
@@ -16,7 +17,6 @@ import {
   parseChatToPlain,
   stripColorCodes,
 } from './chat-color-utils';
-import type { McClient, McPacketMeta, McServer } from './mc-protocol-types';
 import { fetchRemoteServerStatus } from './mc-status';
 
 export type ProxyNetwork = 'pikanetwork' | 'jartexnetwork';

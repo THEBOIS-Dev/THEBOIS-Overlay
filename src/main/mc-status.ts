@@ -21,9 +21,13 @@ function extractRawDescription(result: object): unknown {
   return fields.description ?? fields.motd;
 }
 
+export const uri = /^data:image\/[a-zA-Z0-9.+-]+;base64,(.+)$/;
+
 function extractFavicon(result: object): string | undefined {
   const favicon = (result as { favicon?: unknown }).favicon;
-  return typeof favicon === 'string' && favicon.length > 0 ? favicon : undefined;
+  if (typeof favicon !== 'string' || favicon.length === 0) return undefined;
+  const match = favicon.match(uri);
+  return match ? match[1] : favicon;
 }
 
 async function pingOnce(host: string, port: number): Promise<RemoteServerStatus | null> {

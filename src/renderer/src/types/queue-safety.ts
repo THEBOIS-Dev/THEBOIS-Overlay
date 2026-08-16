@@ -16,10 +16,16 @@ export interface QueueRule {
   username: string;
 }
 
+export interface ExcludedPlayer {
+  id: string;
+  username: string;
+}
+
 export interface QueueSafetyConfig {
   enabled: boolean;
   matchMode: MatchMode;
   rules: QueueRule[];
+  excludedPlayers: ExcludedPlayer[];
 }
 
 interface MetricDef {
@@ -226,7 +232,32 @@ export function defaultQueueSafetyConfig(): QueueSafetyConfig {
     enabled: false,
     matchMode: 'any',
     rules: [],
+    excludedPlayers: [],
   };
+}
+
+export function createExcludedPlayer(
+  overrides: Partial<ExcludedPlayer> = {},
+): ExcludedPlayer {
+  return {
+    id: nanoid(10),
+    username: '',
+    ...overrides,
+  };
+}
+
+export function filterExcludedPlayers(
+  players: Player[],
+  excludedPlayers: ExcludedPlayer[],
+): Player[] {
+  const excludedSet = new Set(
+    excludedPlayers
+      .map((entry) => entry.username.trim().toLowerCase())
+      .filter((username) => username.length > 0),
+  );
+  if (excludedSet.size === 0) return players;
+
+  return players.filter((player) => !excludedSet.has(usernameOf(player).toLowerCase()));
 }
 
 export interface RuleMatch {
@@ -302,7 +333,8 @@ export function evaluateQueueSafety(
     return { unsafe: false, ruleMatches: [], triggeredRules: [], reasons: [] };
   }
 
-  const ruleMatches = config.rules.map((rule) => evaluateRule(rule, players));
+  const eligiblePlayers = filterExcludedPlayers(players, config.excludedPlayers);
+  const ruleMatches = config.rules.map((rule) => evaluateRule(rule, eligiblePlayers));
 
   const unsafe =
     config.matchMode === 'all'

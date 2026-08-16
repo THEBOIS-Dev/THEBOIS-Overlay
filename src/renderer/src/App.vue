@@ -177,11 +177,26 @@ let desiredIgnoring = false;
 let committedIgnoring = false;
 let ignoreCommitTimer: ReturnType<typeof setTimeout> | null = null;
 
+const overlayActive = ref(true);
+
 const headerHovered = ref(false);
 const dropdownOpen = ref(false);
+const dropdownResetters = new Set<() => void>();
+
+function registerDropdownResetter(fn: () => void): () => void {
+  dropdownResetters.add(fn);
+  return () => dropdownResetters.delete(fn);
+}
+
+function resetStuckDropdowns(): void {
+  if (!dropdownOpen.value) return;
+  dropdownOpen.value = false;
+  for (const reset of dropdownResetters) reset();
+}
 
 provide('headerHovered', headerHovered);
 provide('dropdownOpen', dropdownOpen);
+provide('registerDropdownResetter', registerDropdownResetter);
 
 const headerHeight = 42;
 const resizeEdge = 6;
@@ -200,8 +215,12 @@ function commitIgnore(next: boolean): void {
   }
   if (committedIgnoring === next) return;
   committedIgnoring = next;
+  overlayActive.value = !next;
   window.api.win.setIgnoreMouse(next);
-  if (next) flushStaleHover();
+  if (next) {
+    flushStaleHover();
+    resetStuckDropdowns();
+  }
 }
 
 function setIgnore(ignore: boolean): void {
@@ -1083,10 +1102,6 @@ onUnmounted(() => {
       <div class="ambient-layer ambient-br" />
       <div class="ambient-layer ambient-center" />
     </template>
-    <!-- Hybrid glass layer: frosts/saturates the flat color + noise grain
-         for texture, plus a slow, symmetric breathing glow. All purely
-         cosmetic (pointer-events: none) and sit strictly below the real
-         UI (z-index 1+), so they never wash out the chosen color. -->
     <div
       v-if="!config.integratedMode && config.theme.bgType !== 'image'"
       class="overlay-frost noise-veil"
@@ -1101,16 +1116,6 @@ onUnmounted(() => {
       class="relative flex flex-1 flex-col overflow-hidden"
       :style="{ zIndex: 1 }"
     >
-      <!--
-        Title bar lives outside the appVisible fade and gets an explicit
-        z-index (11100) above the app root (11000). The loading screen
-        (10000) sits below both, and all auth/announcement modal backdrops
-        (12000, teleported to <body>) sit above everything. Those modals
-        only become eligible once the loading screen's leave transition has
-        actually finished (postLoadingReady, set in @after-leave), so they
-        never race the loading video's fade-out or the app content's
-        fade-in - they only ever appear once the handoff is visually done.
-      -->
       <div class="titlebar-layer relative shrink-0">
         <TitleBar />
       </div>

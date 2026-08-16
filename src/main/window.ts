@@ -17,9 +17,14 @@ const minHeight = 340;
 let mainWindow: BrowserWindow | null = null;
 let linuxAllowMinimize = false;
 let cursorPollTimer: NodeJS.Timeout | null = null;
+let topmostTimer: NodeJS.Timeout | null = null;
 let lastCursorX = -1;
 let lastCursorY = -1;
 let ignoringMouseEvents = false;
+
+const topmostReassertIntervalMs = 1500;
+const topmostLevel = process.platform === 'darwin' ? 'floating' : 'screen-saver';
+const crosshairDeadZone = 3;
 
 export function getMainWindow(): BrowserWindow | null {
   return mainWindow;
@@ -35,6 +40,27 @@ export function isIgnoringMouseEvents(): boolean {
 
 export function setIgnoringMouseEvents(ignore: boolean): void {
   ignoringMouseEvents = ignore;
+}
+
+function reassertAlwaysOnTop(win: BrowserWindow): void {
+  win.setAlwaysOnTop(false);
+  win.setAlwaysOnTop(true, topmostLevel);
+  if (process.platform === 'win32') win.moveTop();
+}
+
+function startTopmostReassert(win: BrowserWindow): void {
+  if (topmostTimer) return;
+  topmostTimer = setInterval(() => {
+    if (!win.isDestroyed() && win.isVisible() && !win.isMinimized()) {
+      reassertAlwaysOnTop(win);
+    }
+  }, topmostReassertIntervalMs);
+}
+
+function stopTopmostReassert(): void {
+  if (!topmostTimer) return;
+  clearInterval(topmostTimer);
+  topmostTimer = null;
 }
 
 export function createWindow(): BrowserWindow {
@@ -72,7 +98,8 @@ export function createWindow(): BrowserWindow {
 
   mainWindow = win;
   state.manage(win);
-  win.setAlwaysOnTop(true, 'screen-saver');
+  win.setAlwaysOnTop(true, topmostLevel);
+  startTopmostReassert(win);
 
   if (process.platform === 'win32') {
     win.setSkipTaskbar(false);
@@ -95,7 +122,6 @@ export function createWindow(): BrowserWindow {
 
   if (process.platform === 'darwin') {
     win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
-    win.setAlwaysOnTop(true, 'floating');
   }
 
   let saveTimer: NodeJS.Timeout | null = null;
@@ -107,6 +133,7 @@ export function createWindow(): BrowserWindow {
   win.on('move', debounceSave);
 
   win.on('close', () => {
+    stopTopmostReassert();
     win.webContents
       .executeJavaScript(`try { localStorage.removeItem('players') } catch(e) {}`)
       .catch(() => {});
@@ -120,8 +147,6 @@ export function createWindow(): BrowserWindow {
 
   return win;
 }
-
-const crosshairDeadZone = 3;
 
 export function startCursorPoll(): void {
   if (cursorPollTimer) return;

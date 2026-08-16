@@ -3,7 +3,11 @@ import type { QueueSafetyConfig } from '@renderer/types/queue-safety';
 import type { PiniaPluginContext } from 'pinia';
 import { defaultPaletteId, getPalette } from '@renderer/palettes';
 import { Column } from '@renderer/types';
-import { createRule, defaultQueueSafetyConfig } from '@renderer/types/queue-safety';
+import {
+  createExcludedPlayer,
+  createRule,
+  defaultQueueSafetyConfig,
+} from '@renderer/types/queue-safety';
 import { defineStore } from 'pinia';
 import 'pinia-plugin-persistedstate';
 
@@ -127,7 +131,7 @@ const DefaultColumns: Column[] = [
   Column.WIN_STREAK,
 ];
 
-const configVersion = 7;
+const configVersion = 8;
 
 interface ConfigMigration {
   keys: (keyof ConfigState)[];
@@ -140,6 +144,7 @@ const migrations: Record<number, ConfigMigration> = {
   5: { keys: ['perfLoggingEnabled'] },
   6: { keys: ['queueSafety'] },
   7: { keys: ['queueSafety'] },
+  8: { keys: ['queueSafety'] },
 };
 
 const ValidColumns = new Set<string>(Object.values(Column));
@@ -368,10 +373,16 @@ export const useConfigStore = defineStore('config', {
         const rules = Array.isArray(store.queueSafety.rules)
           ? store.queueSafety.rules
           : [];
+        const excludedPlayers = Array.isArray(store.queueSafety.excludedPlayers)
+          ? store.queueSafety.excludedPlayers
+          : [];
         store.queueSafety = {
           ...defaults,
           ...store.queueSafety,
           rules: rules.map((rule) => createRule(rule)),
+          excludedPlayers: excludedPlayers.map((excludedPlayer) =>
+            createExcludedPlayer(excludedPlayer),
+          ),
           matchMode:
             store.queueSafety.matchMode === 'any' || store.queueSafety.matchMode === 'all'
               ? store.queueSafety.matchMode
