@@ -3,40 +3,44 @@ import path from 'node:path';
 import { test } from '@playwright/test';
 import { _electron as electron } from 'playwright';
 
-const pika = [
-  'voodootje0',
-  'Arrly',
-  'JustThiemo',
-  '_Luanne',
-  'Ehtne',
-  'Darnly',
-  'Vaitren',
-  'tobin',
-  'Climbby',
-  'meoweys',
-  'resuns',
-  'izoo_',
-  'Si1ent_',
-  'Hiqhest',
-  'IStayKittens',
-];
+const api = 'https://craftigames.kyizl.is-a.dev/api/staff';
 
-const jartex = [
-  'voodootje0',
-  'iFlyYT',
-  'JustThiemo',
-  'bene_e',
-  'Stxrs',
-  'Djim',
-  'Faoloe',
-  'Climbby',
-  'Lexi58',
-  'Meelb',
-  'DARKpeveresh',
-  'Sandy07',
-  'Si1ent_',
-  'IStayKittens',
-];
+interface StaffApiResponse {
+  groups: { members: { username: string }[] }[];
+}
+
+async function fetchStaffUsernames(network: 'pika' | 'jartex'): Promise<string[]> {
+  const response = await fetch(`${api}/${network}`);
+  if (!response.ok) {
+    throw new Error(
+      `[showcase] staff API request failed for ${network}: ${response.status}`,
+    );
+  }
+
+  const data = (await response.json()) as StaffApiResponse;
+  return data.groups.map((group) => group.members[0].username);
+}
+
+const NON_STAFF_USERNAMES = {
+  pika: [
+    'Climbby', // Partner
+    'avised', // Champion
+    'resuns', // Titan
+    'izoo_', // Elite
+    'Si1ent_', // VIP
+    'Hiqhest', // NON
+    'IStayKittens', // Nicked
+  ],
+  jartex: [
+    'Climbby', // Partner
+    'Lexi58', // Crystal
+    'Meelb', // Diamond
+    'DARKpeveresh', // Gold
+    'Sandy07', // Iron
+    'Si1ent_', // NON
+    'IStayKittens', // Nicked
+  ],
+};
 
 const columns = [
   'NAME',
@@ -197,6 +201,29 @@ async function captureShowcase(
         if (!state) throw new Error('[showcase] pinia state not found');
         const api = net === 'jartexnetwork' ? window.api.jartex : window.api.pika;
 
+        const normalizeProfile = (
+          profile: Record<string, unknown> | null,
+        ): Record<string, unknown> | null => {
+          if (!profile) return profile;
+          const rank = profile.rank as { rankDisplay?: string } | undefined;
+          if (!rank?.rankDisplay?.includes('Partner')) return profile;
+          const ranks = profile.ranks as { name: string }[];
+          if (ranks.some((r) => r.name === 'partner')) return profile;
+          return {
+            ...profile,
+            ranks: [
+              ...ranks,
+              {
+                name: 'partner',
+                displayName: 'Partner',
+                server: '',
+                season: null,
+                expiry: -1,
+              },
+            ],
+          };
+        };
+
         for (const name of names) {
           (state.players.players as unknown[]).push({
             name,
@@ -236,7 +263,9 @@ async function captureShowcase(
               } else if (result.rateLimit) {
                 p.error = 'rate_limited';
               } else {
-                p.profile = result.profile;
+                p.profile = normalizeProfile(
+                  result.profile as Record<string, unknown> | null,
+                );
                 p.stats = result.stats;
                 const apiName =
                   typeof result.profile === 'object' && result.profile !== null
@@ -293,8 +322,6 @@ async function captureShowcase(
       const tbodyH = tbody instanceof HTMLElement ? tbody.scrollHeight : 0;
       const footerH = footer instanceof HTMLElement ? footer.offsetHeight : 34;
 
-      // Measure the table's natural content width (sum of whitespace-nowrap columns)
-      // rather than body.scrollWidth which includes the over-expanded 2000px window.
       const table = document.querySelector('table') as HTMLElement | null;
       const w = table?.scrollWidth ?? document.body.scrollWidth;
 
@@ -341,6 +368,19 @@ async function captureShowcase(
 }
 
 test.setTimeout(180_000);
+
+let pika: string[] = [];
+let jartex: string[] = [];
+
+test.beforeAll(async () => {
+  const [pikaStaff, jartexStaff] = await Promise.all([
+    fetchStaffUsernames('pika'),
+    fetchStaffUsernames('jartex'),
+  ]);
+
+  pika = [...pikaStaff, ...NON_STAFF_USERNAMES.pika];
+  jartex = [...jartexStaff, ...NON_STAFF_USERNAMES.jartex];
+});
 
 test('capture pika showcase', async () => {
   await captureShowcase(pika, { ...base, network: 'pikanetwork' }, 'showcase-pika.png');

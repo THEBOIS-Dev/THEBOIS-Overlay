@@ -1,17 +1,20 @@
 <script setup lang="ts">
 import type { Player } from '@renderer/types';
+import { resolveStaffSubrole } from '@renderer/lib/staff-subroles';
+import { useConfigStore } from '@renderer/store/config';
 import {
   Column,
   COLUMNS,
   fmt,
   getTopRankDisplay,
+  getTopRankName,
   isStaff,
   levelColor,
   playerNameColor,
   statColor,
 } from '@renderer/types';
 import { X } from 'lucide-vue-next';
-import { computed, useId } from 'vue';
+import { computed, ref, useId, watch } from 'vue';
 import PlayerAvatar from './PlayerAvatar.vue';
 
 const props = defineProps<{
@@ -29,6 +32,38 @@ const ccStrokeId = `cc-stroke-${uid}`;
 const ccFillId = `cc-fill-${uid}`;
 
 const showcase = localStorage.getItem('skip-remove-btn') === '1';
+
+const config = useConfigStore();
+const staffBadgeLabel = ref('Staff');
+
+watch(
+  () => ({
+    active: isStaff(props.player.profile),
+    network: config.network,
+    rankName: getTopRankName(props.player.profile),
+    username: props.player.profile?.username ?? props.player.realName ?? null,
+  }),
+  (params, _previous, onCleanup) => {
+    if (!params.active || !params.username) {
+      staffBadgeLabel.value = 'Staff';
+      return;
+    }
+
+    let cancelled = false;
+    onCleanup(() => {
+      cancelled = true;
+    });
+
+    resolveStaffSubrole(params.network, params.rankName, params.username)
+      .then((subrole) => {
+        if (!cancelled) staffBadgeLabel.value = subrole ?? 'Staff';
+      })
+      .catch(() => {
+        if (!cancelled) staffBadgeLabel.value = 'Staff';
+      });
+  },
+  { immediate: true, deep: true },
+);
 
 const derived = computed(() => {
   const profile = props.player.profile;
@@ -238,7 +273,7 @@ function cellColor(column: Column): string {
             v-if="derived.staffPlayer"
             class="badge badge-staff"
           >
-            Staff
+            {{ staffBadgeLabel }}
           </span>
 
           <span
@@ -648,17 +683,18 @@ html.low-end .player-row:hover {
   justify-content: center;
   align-self: center;
   min-width: max-content;
-  height: 17px;
+  height: 18px;
   padding: 0 8px;
   border-radius: 999px;
   font-family: Inter, system-ui, sans-serif;
-  font-size: 9.5px;
+  font-size: 10px;
   font-weight: 900;
   line-height: 1;
   letter-spacing: 0.03em;
   text-transform: uppercase;
   white-space: nowrap;
   -webkit-font-smoothing: antialiased;
+  transform: translateZ(0);
 }
 
 .badge-staff {
