@@ -127,6 +127,11 @@ async function verifyApiKey(apiKey: string): Promise<VerifyResult> {
   }
 }
 
+export async function getLinkedApiKey(): Promise<string | null> {
+  const state = await loadState();
+  return state.apiKey;
+}
+
 export async function isLinked(): Promise<boolean> {
   const state = await loadState();
   if (state.apiKey === null) return false;

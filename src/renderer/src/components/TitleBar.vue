@@ -10,6 +10,7 @@ import {
   Camera,
   ChevronDown,
   Home,
+  LifeBuoy,
   Menu,
   Minus,
   Palette,
@@ -83,6 +84,7 @@ const isHome = computed(() => route.name === 'Home');
 const isSettings = computed(() => route.name === 'Settings');
 const isSetup = computed(() => route.name === 'Setup');
 const isQueue = computed(() => route.name === 'Queue');
+const isSupport = computed(() => route.name === 'Support');
 
 const isJartex = computed(() => config.network === 'jartexnetwork');
 const networkAccent = computed(() => (isJartex.value ? '#22d3ee' : '#ffea00'));
@@ -108,6 +110,7 @@ const endpoints = [
   { to: '/nicks', label: 'Nicks', icon: Tag },
   { to: '/theme', label: 'Theme', icon: Palette },
   { to: '/queue', label: 'Queue', icon: ShieldAlert },
+  { to: '/support', label: 'Support', icon: LifeBuoy },
   { to: '/settings', label: 'Settings', icon: Settings },
   { to: '/setup', label: 'Setup', icon: Wrench },
   { to: '/benchmark', label: 'Benchmark', icon: Activity },
@@ -314,7 +317,7 @@ async function doScreenshot(): Promise<void> {
     </div>
 
     <div class="no-drag flex items-center gap-1.5">
-      <template v-if="!isSettings && !isSetup && !isQueue">
+      <template v-if="!isSettings && !isSetup && !isQueue && !isSupport">
         <div class="relative">
           <input
             v-model.trim="addInput"

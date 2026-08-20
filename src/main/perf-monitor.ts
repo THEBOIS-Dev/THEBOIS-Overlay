@@ -36,16 +36,20 @@ export function instrumentIpcHandlers(): void {
       channel,
       async (event: IpcMainInvokeEvent, ...args: unknown[]) => {
         const start = performance.now();
+        let errorMessage: string | undefined;
         try {
           const result: unknown = await listener(event, ...args);
           return result;
         } catch (error) {
-          const durMs = performance.now() - start;
-          pushEvent({ t: start, channel, durMs, error: (error as Error).message });
+          errorMessage = (error as Error).message;
           throw error;
         } finally {
-          const durMs = performance.now() - start;
-          pushEvent({ t: start, channel, durMs });
+          pushEvent({
+            t: start,
+            channel,
+            durMs: performance.now() - start,
+            error: errorMessage,
+          });
         }
       },
     );

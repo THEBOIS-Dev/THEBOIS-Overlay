@@ -5,6 +5,8 @@ import { dbg } from './logger';
 
 const concurrent = 12;
 const ttl = 600_000;
+const cacheMaxEntries = 2_000;
+const cacheSweepIntervalMs = 120_000;
 
 export const httpAgent = new http.Agent({ keepAlive: true, maxSockets: concurrent });
 export const httpsAgent = new https.Agent({ keepAlive: true, maxSockets: concurrent });
@@ -16,9 +18,20 @@ interface CacheEntry<T> {
 
 class SimpleCache {
   private store = new Map<string, CacheEntry<unknown>>();
+  private sweepTimer: NodeJS.Timeout;
+
+  constructor() {
+    this.sweepTimer = setInterval(() => this.sweep(), cacheSweepIntervalMs);
+    this.sweepTimer.unref();
+  }
 
   set<T>(key: string, data: T, ttlMs: number = ttl): void {
+    this.store.delete(key);
     this.store.set(key, { data, expires: Date.now() + ttlMs });
+    if (this.store.size > cacheMaxEntries) {
+      const oldestKey = this.store.keys().next().value;
+      if (oldestKey !== undefined) this.store.delete(oldestKey);
+    }
     dbg.cache(`SET  "${key}"  (TTL ${ttlMs / 1000}s, store size: ${this.store.size})`);
   }
 
@@ -38,9 +51,30 @@ class SimpleCache {
     return entry.data as T;
   }
 
+  private sweep(): void {
+    const now = Date.now();
+    let purged = 0;
+    for (const [key, entry] of this.store) {
+      if (now > entry.expires) {
+        this.store.delete(key);
+        purged++;
+      }
+    }
+    if (purged > 0) {
+      dbg.cache(
+        `SWEEP (${purged} expired entries purged, store size: ${this.store.size})`,
+      );
+    }
+  }
+
   clear(): void {
     dbg.cache(`CLEAR (${this.store.size} entries flushed)`);
     this.store.clear();
+  }
+
+  dispose(): void {
+    clearInterval(this.sweepTimer);
+    this.clear();
   }
 }
 
@@ -186,7 +220,7 @@ export async function apiGet<T = unknown>(url: string) {
 }
 
 export function disposeHttpClient(): void {
-  cache.clear();
+  cache.dispose();
   httpAgent.destroy();
   httpsAgent.destroy();
 }

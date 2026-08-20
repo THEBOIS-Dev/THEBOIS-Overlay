@@ -560,6 +560,37 @@ export type ProxyEventPayload =
 export type TelemetryEventPayload =
   { type: 'linking' } | { type: 'linked' } | { type: 'error'; message: string };
 
+export interface SupportConversationSummary {
+  id: string;
+  subject: string;
+  status: string;
+  createdAt: number;
+  updatedAt: string | null;
+}
+
+export interface SupportMessage {
+  id: string;
+  body: string;
+  fromSupport: boolean;
+  senderName: string | null;
+  senderAvatarUrl: string | null;
+  createdAt: string;
+}
+
+export interface SupportConversationDetail {
+  id: string;
+  subject: string;
+  status: string;
+  messages: SupportMessage[];
+}
+
+export type SupportSocketEvent =
+  | { type: 'connected' }
+  | { type: 'disconnected' }
+  | { type: 'message'; conversationId: string; message: SupportMessage };
+
+export type SupportResult<T> = { ok: true; data: T } | { ok: false; error: string };
+
 export interface TeamInfo {
   name: string;
   displayName: string;
@@ -613,16 +644,13 @@ declare global {
         toggleMinimize: () => void;
         openExternal: (url: string) => void;
         screenshot: () => Promise<void>;
-        fitColumns: (numColumns: number, nameColPx: number) => void;
         fitContentWidth: (width: number) => void;
         setIgnoreMouse: (ignore: boolean) => void;
-        focus: () => void;
         onForwardedMove: (
           callback: (x: number | null, y: number | null) => void,
         ) => () => void;
       };
       app: {
-        getVersion: () => Promise<string>;
         getPath: (name: string) => Promise<string>;
         findLunarLog: () => Promise<string>;
         openImageDialog: () => Promise<{
@@ -631,7 +659,6 @@ declare global {
           bookmarks?: string[];
         }>;
         readFileBase64: (filePath: string) => Promise<string>;
-        onClearPlayers: (callback: () => void) => () => void;
       };
       log: {
         setPath: (path: string | null) => void;
@@ -643,11 +670,7 @@ declare global {
         register: (shortcuts: string[]) => Promise<void>;
         onFired: (callback: (shortcut: string) => void) => () => void;
       };
-      skin: {
-        fetch: (username: string) => Promise<string | null>;
-      };
       rpc: {
-        init: () => Promise<void>;
         setEnabled: (enabled: boolean) => void;
         setActive: (active: boolean) => void;
         setNetwork: (network: string) => void;
@@ -679,18 +702,22 @@ declare global {
         startLink: () => void;
         onEvent: (callback: (event: TelemetryEventPayload) => void) => () => void;
       };
+      support: {
+        list: () => Promise<
+          SupportResult<{ conversations: SupportConversationSummary[] }>
+        >;
+        create: (
+          subject: string,
+          message: string,
+        ) => Promise<SupportResult<SupportConversationSummary>>;
+        get: (id: string) => Promise<SupportResult<SupportConversationDetail>>;
+        reply: (id: string, message: string) => Promise<SupportResult<SupportMessage>>;
+        connectSocket: () => void;
+        disconnectSocket: () => void;
+        onSocketEvent: (callback: (event: SupportSocketEvent) => void) => () => void;
+      };
       perf: {
         dump: (rendererSnapshot: unknown) => Promise<string>;
-        processMetrics: () => Promise<{
-          uptimeMs: number;
-          processMemory: { rssMB: number; heapUsedMB: number };
-          appMetrics: Array<{
-            pid: number;
-            type: string;
-            cpuPercent: number;
-            memoryMB: number;
-          }>;
-        }>;
         startTrace: () => Promise<boolean>;
         stopTrace: () => Promise<string | null>;
         openLogDir: () => Promise<string>;

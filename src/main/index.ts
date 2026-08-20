@@ -8,7 +8,10 @@ import { destroyRpcClient } from './ipc/rpc-handlers';
 import { unregisterAllShortcuts } from './ipc/shortcuts-handlers';
 import { dbg } from './logger';
 import { startProxyManager, stopProxyManager } from './proxy-service';
+import { disconnectSupportSocket } from './support-socket';
 import { createWindow, getMainWindow, stopCursorPoll } from './window';
+
+export const api = 'https://overlay.kyizl.is-a.dev';
 
 const disabledChromiumFeatures = [
   'HardwareMediaKeyHandling',
@@ -64,6 +67,7 @@ if (!gotSingleInstanceLock) {
     void (async () => {
       stopCursorPoll();
       unregisterAllShortcuts();
+      disconnectSupportSocket();
       await stopLogTail();
       await destroyRpcClient();
       await stopProxyManager();

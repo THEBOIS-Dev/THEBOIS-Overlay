@@ -1,19 +1,9 @@
-import { Buffer } from 'node:buffer';
-import axios from 'axios';
 import { ipcMain } from 'electron';
-import { apiGet, cache, dedupe, httpsAgent } from '../http-client';
+import { apiGet, cache, dedupe } from '../http-client';
 import { dbg } from '../logger';
 
 const pika = 'https://stats.pika-network.net/api';
 const jartex = 'https://stats.jartexnetwork.com/api';
-
-function skin(username: string): string[] {
-  return [
-    `https://starlightskins.lunareclipse.studio/render/ultimate/${encodeURIComponent(username)}/full`,
-    `https://visage.surgeplay.com/full/512/${encodeURIComponent(username)}`,
-    `https://mc-heads.net/body/${encodeURIComponent(username)}/100`,
-  ];
-}
 
 type StatsNetwork = 'pika' | 'jartex';
 
@@ -32,7 +22,6 @@ export function registerStatsHandlers(): void {
   ipcMain.handle('jartex:fetch', createFetchHandler('jartex', jartex));
   ipcMain.handle('jartex:stats', createStatsHandler('jartex', jartex));
   ipcMain.handle('jartex:clan', createClanHandler('jartex', jartex));
-  ipcMain.handle('skin:fetch', async (_, username: string) => fetchSkinRender(username));
 }
 
 function createFetchHandler(network: StatsNetwork, base: string) {
@@ -259,28 +248,4 @@ function createClanHandler(network: StatsNetwork, base: string) {
       return response.data;
     });
   };
-}
-
-async function fetchSkinRender(username: string): Promise<string | null> {
-  for (const url of skin(username)) {
-    try {
-      const response = await axios.get<ArrayBuffer>(url, {
-        timeout: 10_000,
-        responseType: 'arraybuffer',
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        },
-        validateStatus: (status) => status === 200,
-        httpsAgent,
-      });
-      const buffer = Buffer.from(response.data);
-      const contentType =
-        (response.headers['content-type'] as string | undefined) ?? 'image/png';
-      const mime = contentType.split(';')[0].trim();
-      return `data:${mime};base64,${buffer.toString('base64')}`;
-    } catch {
-      continue;
-    }
-  }
-  return null;
 }

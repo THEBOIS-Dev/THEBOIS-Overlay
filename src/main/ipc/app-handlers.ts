@@ -15,8 +15,6 @@ const mimeByExtension: Record<string, string> = {
 };
 
 export function registerAppHandlers(): void {
-  ipcMain.handle('app:get-version', () => app.getVersion());
-
   ipcMain.handle('app:get-path', (_, name: string) =>
     app.getPath(name as Parameters<typeof app.getPath>[0]),
   );

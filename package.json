@@ -141,10 +141,9 @@
   },
   "allowScripts": {
     "vue-demi@0.14.10": true,
-    "esbuild@0.25.12": true,
-    "esbuild@0.28.1": true,
     "electron-winstaller@5.4.0": true,
-    "github:devsnek/node-register-scheme#e7cc9a63a1f512565da44cb57316d9fb10750e17": true
+    "github:devsnek/node-register-scheme#e7cc9a63a1f512565da44cb57316d9fb10750e17": true,
+    "esbuild@0.28.2": true
   },
   "trustedDependencies": [
     "electron",

@@ -2,6 +2,30 @@ import type { IpcRendererEvent } from 'electron';
 import process from 'node:process';
 import { contextBridge, ipcRenderer } from 'electron';
 
+interface SupportConversationSummary {
+  id: string;
+  subject: string;
+  status: string;
+  createdAt: number;
+  updatedAt: string | null;
+}
+
+interface SupportMessage {
+  id: string;
+  body: string;
+  fromSupport: boolean;
+  senderName: string | null;
+  senderAvatarUrl: string | null;
+  createdAt: string;
+}
+
+interface SupportConversationDetail {
+  id: string;
+  subject: string;
+  status: string;
+  messages: SupportMessage[];
+}
+
 const api = {
   platform: process.platform as string,
 
@@ -69,7 +93,6 @@ const api = {
     fitContentWidth: (desiredContentWidth: number) =>
       ipcRenderer.send('win:fit-content-width', desiredContentWidth),
     setIgnoreMouse: (ignore: boolean) => ipcRenderer.send('win:set-ignore-mouse', ignore),
-    focus: () => ipcRenderer.send('win:focus'),
     onForwardedMove: (cb: (x: number | null, y: number | null) => void): (() => void) => {
       const handler = (_: IpcRendererEvent, x: number | null, y: number | null): void =>
         cb(x, y);
@@ -79,8 +102,6 @@ const api = {
   },
 
   app: {
-    getVersion: async (): Promise<string> =>
-      ipcRenderer.invoke('app:get-version') as Promise<string>,
     getPath: async (name: string): Promise<string> =>
       ipcRenderer.invoke('app:get-path', name) as Promise<string>,
     findLunarLog: async (): Promise<string> =>
@@ -91,11 +112,6 @@ const api = {
       ) as Promise<Electron.OpenDialogReturnValue>,
     readFileBase64: async (filePath: string): Promise<string> =>
       ipcRenderer.invoke('app:read-file-base64', filePath) as Promise<string>,
-    onClearPlayers: (cb: () => void): (() => void) => {
-      const handler = () => cb();
-      ipcRenderer.on('app:clear-players', handler);
-      return () => ipcRenderer.off('app:clear-players', handler);
-    },
   },
 
   log: {
@@ -105,7 +121,9 @@ const api = {
     openDialog: async (): Promise<Electron.OpenDialogReturnValue> =>
       ipcRenderer.invoke('log:open-dialog') as Promise<Electron.OpenDialogReturnValue>,
     onLine: (cb: (line: string) => void): (() => void) => {
-      const handler = (_: IpcRendererEvent, line: string): void => cb(line);
+      const handler = (_: IpcRendererEvent, lines: string[]): void => {
+        for (const line of lines) cb(line);
+      };
       ipcRenderer.on('log:line', handler);
       return () => ipcRenderer.off('log:line', handler);
     },
@@ -121,13 +139,7 @@ const api = {
     },
   },
 
-  skin: {
-    fetch: async (username: string): Promise<string | null> =>
-      ipcRenderer.invoke('skin:fetch', username) as Promise<string | null>,
-  },
-
   rpc: {
-    init: async (): Promise<void> => ipcRenderer.invoke('rpc:init', '') as Promise<void>,
     setEnabled: (enabled: boolean) => ipcRenderer.send('rpc:set-enabled', enabled),
     setActive: (active: boolean) => ipcRenderer.send('rpc:set-active', active),
     setNetwork: (network: string) => ipcRenderer.send('rpc:set-network', network),
@@ -217,29 +229,51 @@ const api = {
     },
   },
 
+  support: {
+    list: async (): Promise<
+      | { ok: true; data: { conversations: SupportConversationSummary[] } }
+      | { ok: false; error: string }
+    > =>
+      ipcRenderer.invoke('support:list') as Promise<
+        | { ok: true; data: { conversations: SupportConversationSummary[] } }
+        | { ok: false; error: string }
+      >,
+    create: async (
+      subject: string,
+      message: string,
+    ): Promise<
+      { ok: true; data: SupportConversationSummary } | { ok: false; error: string }
+    > =>
+      ipcRenderer.invoke('support:create', subject, message) as Promise<
+        { ok: true; data: SupportConversationSummary } | { ok: false; error: string }
+      >,
+    get: async (
+      id: string,
+    ): Promise<
+      { ok: true; data: SupportConversationDetail } | { ok: false; error: string }
+    > =>
+      ipcRenderer.invoke('support:get', id) as Promise<
+        { ok: true; data: SupportConversationDetail } | { ok: false; error: string }
+      >,
+    reply: async (
+      id: string,
+      message: string,
+    ): Promise<{ ok: true; data: SupportMessage } | { ok: false; error: string }> =>
+      ipcRenderer.invoke('support:reply', id, message) as Promise<
+        { ok: true; data: SupportMessage } | { ok: false; error: string }
+      >,
+    connectSocket: () => ipcRenderer.send('support:socket-connect'),
+    disconnectSocket: () => ipcRenderer.send('support:socket-disconnect'),
+    onSocketEvent: (cb: (event: unknown) => void): (() => void) => {
+      const handler = (_: IpcRendererEvent, event: unknown): void => cb(event);
+      ipcRenderer.on('support:socket-event', handler);
+      return () => ipcRenderer.off('support:socket-event', handler);
+    },
+  },
+
   perf: {
     dump: async (rendererSnapshot: unknown): Promise<string> =>
       ipcRenderer.invoke('perf:dump', rendererSnapshot) as Promise<string>,
-    processMetrics: async (): Promise<{
-      uptimeMs: number;
-      processMemory: { rssMB: number; heapUsedMB: number };
-      appMetrics: Array<{
-        pid: number;
-        type: string;
-        cpuPercent: number;
-        memoryMB: number;
-      }>;
-    }> =>
-      ipcRenderer.invoke('perf:process-metrics') as Promise<{
-        uptimeMs: number;
-        processMemory: { rssMB: number; heapUsedMB: number };
-        appMetrics: Array<{
-          pid: number;
-          type: string;
-          cpuPercent: number;
-          memoryMB: number;
-        }>;
-      }>,
     startTrace: async (): Promise<boolean> =>
       ipcRenderer.invoke('perf:start-trace') as Promise<boolean>,
     stopTrace: async (): Promise<string | null> =>

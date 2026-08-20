@@ -34,6 +34,11 @@ const router = createRouter({
       component: async () => import('@renderer/views/Queue.vue'),
     },
     {
+      path: '/support',
+      name: 'Support',
+      component: async () => import('@renderer/views/Support.vue'),
+    },
+    {
       path: '/benchmark',
       name: 'Benchmark',
       component: async () => import('@renderer/components/BenchmarkPanel.vue'),

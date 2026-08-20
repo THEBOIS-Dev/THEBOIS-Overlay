@@ -27,11 +27,6 @@ let rpcIsActive = false;
 let rpcCurrentNetwork = 'pikanetwork';
 
 export function registerRpcHandlers(): void {
-  ipcMain.handle('rpc:init', async () => {
-    dbg.rpc('rpc:init called');
-    await initRpc();
-  });
-
   ipcMain.on('rpc:set-enabled', (_, enabled: boolean) => {
     void (async () => {
       dbg.rpc(`rpc:set-enabled  enabled=${enabled}`);
@@ -50,8 +45,6 @@ export function registerRpcHandlers(): void {
     rpcCurrentNetwork = network;
     applyRpcActivity();
   });
-
-  ipcMain.on('rpc:update', () => {});
 
   ipcMain.on('rpc:destroy', () => {
     void destroyRpcClient();

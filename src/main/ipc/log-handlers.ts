@@ -5,9 +5,13 @@ import { dialog, ipcMain } from 'electron';
 import { dbg } from '../logger';
 import { getMainWindow } from '../window';
 
+const logBatchIntervalMs = 16;
+
 let logTail: TailFile | null = null;
 let logReadline: readline.Interface | null = null;
 let restartTimer: NodeJS.Timeout | null = null;
+let lineBuffer: string[] = [];
+let flushTimer: NodeJS.Timeout | null = null;
 
 export function registerLogHandlers(): void {
   ipcMain.on('log:set-path', (_, path: string | null) => {
@@ -50,6 +54,28 @@ export async function stopLogTail(): Promise<void> {
       .catch((error: Error) => dbg.error(`Error closing tail: ${error.message}`));
     logTail = null;
   }
+  flushLineBuffer();
+  if (flushTimer) {
+    clearTimeout(flushTimer);
+    flushTimer = null;
+  }
+}
+
+function queueLine(line: string): void {
+  lineBuffer.push(line);
+  if (!flushTimer) {
+    flushTimer = setTimeout(() => {
+      flushTimer = null;
+      flushLineBuffer();
+    }, logBatchIntervalMs);
+  }
+}
+
+function flushLineBuffer(): void {
+  if (lineBuffer.length === 0) return;
+  const lines = lineBuffer;
+  lineBuffer = [];
+  getMainWindow()?.webContents.send('log:line', lines);
 }
 
 async function startLogTail(path: string): Promise<void> {
@@ -60,7 +86,7 @@ async function startLogTail(path: string): Promise<void> {
     await logTail.start();
     logReadline = readline.createInterface({ input: logTail, crlfDelay: Infinity });
     logReadline.on('line', (line) => {
-      getMainWindow()?.webContents.send('log:line', stripMcColorCodes(line));
+      queueLine(stripMcColorCodes(line));
     });
     dbg.ipc(`Log tail started: ${path}`);
   } catch (error) {

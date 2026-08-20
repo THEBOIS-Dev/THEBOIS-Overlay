@@ -47,12 +47,6 @@ export function registerPerfHandlers(): void {
     return target;
   });
 
-  ipcMain.handle('perf:process-metrics', async () => ({
-    uptimeMs: getMainUptimeMs(),
-    processMemory: getCurrentProcessMemoryMB(),
-    appMetrics: await getMainProcessMetrics(),
-  }));
-
   ipcMain.handle('perf:start-trace', async () => {
     if (tracing) return false;
     tracing = true;

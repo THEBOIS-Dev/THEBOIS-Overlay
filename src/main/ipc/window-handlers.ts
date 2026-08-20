@@ -53,16 +53,6 @@ export function registerWindowHandlers(): void {
     }
   });
 
-  ipcMain.on('win:focus', () => {
-    const win = getMainWindow();
-    if (!win) return;
-
-    if (!win.isFocused()) {
-      win.setAlwaysOnTop(true, 'screen-saver');
-      win.focus();
-    }
-  });
-
   ipcMain.on('win:fit-content-width', (_, desiredContentWidth: number) => {
     const win = getMainWindow();
     if (!win) return;
