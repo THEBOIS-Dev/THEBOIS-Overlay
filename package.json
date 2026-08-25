@@ -125,7 +125,7 @@
     "electron": "^43.4.1",
     "electron-builder": "^26.15.3",
     "electron-vite": "^5.0.0",
-    "eslint": "^10.8.0",
+    "eslint": "^10.9.0",
     "eslint-config-prettier": "^10.0.0",
     "eslint-plugin-format": "^2.0.1",
     "knip": "^6.32.2",
@@ -137,7 +137,7 @@
     "tsx": "^4.23.12",
     "typescript": "7.0.2",
     "vitest": "^4.1.11",
-    "vue-tsc": "^3.3.10"
+    "vue-tsc": "^3.3.11"
   },
   "allowScripts": {
     "vue-demi@0.14.10": true,
