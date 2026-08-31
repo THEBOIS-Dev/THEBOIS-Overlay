@@ -128,7 +128,7 @@
     "eslint": "^10.9.1",
     "eslint-config-prettier": "^10.0.0",
     "eslint-plugin-format": "^2.0.1",
-    "knip": "^6.32.2",
+    "knip": "^6.32.3",
     "playwright": "^1.62.1",
     "prettier": "^3.9.6",
     "prettier-plugin-tailwindcss": "^0.8.1",
