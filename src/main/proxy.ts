@@ -1,7 +1,7 @@
 import type { ClientOptions } from 'minecraft-protocol';
 import type { Buffer } from 'node:buffer';
 import type { Socket } from 'node:net';
-import type { McClient, McPacketMeta, McServer } from './mc-protocol-types';
+import type { McClient, McServer } from './mc-protocol-types';
 import { EventEmitter } from 'node:events';
 import { connect } from 'node:net';
 import { homedir } from 'node:os';
@@ -92,6 +92,415 @@ function isRetryableError(error: Error): boolean {
   );
 }
 
+type PacketDirection = 'serverbound' | 'clientbound';
+type PendingQueue =
+  'serverPlay' | 'serverConfiguration' | 'clientPlay' | 'clientConfiguration';
+
+interface ParsedPacket {
+  metadata: { size: number };
+  data: { name: string; params: Record<string, unknown> };
+}
+
+interface PacketEndpoint extends McClient {
+  decompressor?: NodeJS.EventEmitter;
+  splitter: NodeJS.EventEmitter;
+  deserializer: { parsePacketBuffer: (buffer: Buffer) => ParsedPacket };
+}
+
+interface DecodedPacketEvent {
+  direction: PacketDirection;
+  state: string;
+  name: string;
+  data: Record<string, unknown>;
+}
+
+interface ProxyConnectionOptions {
+  server: McServer;
+  client: McClient;
+  remoteHost: string;
+  remotePort: number;
+}
+
+/**
+ * One transparent Minecraft connection.
+ *
+ * Packet buffers are forwarded before decoding and decoding is only used for
+ * state synchronization and overlay features. A decode failure can therefore
+ * never drop or rewrite traffic between the real client and server.
+ */
+class ProxyConnection extends EventEmitter {
+  private readonly server: McServer;
+  private readonly client: McClient;
+  private readonly remoteHost: string;
+  private readonly remotePort: number;
+  private readonly pending: Record<PendingQueue, Buffer[]> = {
+    serverPlay: [],
+    serverConfiguration: [],
+    clientPlay: [],
+    clientConfiguration: [],
+  };
+  private readonly cleanup: Array<() => void> = [];
+  private readonly observedUpstreams = new WeakSet<object>();
+  private upstream: McClient | null = null;
+  private upstreamReady = false;
+  private upstreamDisconnectReason: string | null = null;
+  private configurationReady = false;
+  private awaitingConfigurationAcknowledgement = false;
+  private retryAttempt = 0;
+  private ended = false;
+
+  constructor(options: ProxyConnectionOptions) {
+    super();
+    this.server = options.server;
+    this.client = options.client;
+    this.remoteHost = options.remoteHost;
+    this.remotePort = options.remotePort;
+  }
+
+  start(): this {
+    this.observePackets(this.client, 'serverbound');
+
+    const onConfigurationReady = (): void => {
+      this.configurationReady = true;
+      this.flush('clientConfiguration', this.client);
+    };
+    this.client.on('proxy-configuration-ready', onConfigurationReady);
+    this.cleanup.push(() =>
+      this.client.off('proxy-configuration-ready', onConfigurationReady),
+    );
+
+    const onLocalPlayerJoin = (joinedClient: McClient): void => {
+      if (joinedClient !== this.client) return;
+      this.flush('clientPlay', this.client);
+      this.server.off('playerJoin', onLocalPlayerJoin);
+    };
+    this.server.on('playerJoin', onLocalPlayerJoin);
+    this.cleanup.push(() => this.server.off('playerJoin', onLocalPlayerJoin));
+
+    const onClientEnd = (): void => this.close();
+    this.client.once('end', onClientEnd);
+    this.cleanup.push(() => this.client.off('end', onClientEnd));
+
+    this.connectUpstream(false);
+    return this;
+  }
+
+  close(reason = 'Proxy session ended'): void {
+    if (this.ended) return;
+    this.ended = true;
+
+    for (const unsubscribe of this.cleanup.splice(0)) unsubscribe();
+
+    if (this.upstream && !this.upstream.ended) {
+      try {
+        this.upstream.end(reason);
+      } catch {}
+    }
+    if (!this.client.ended) {
+      try {
+        this.client.end(reason);
+      } catch {}
+    }
+
+    this.emit('close');
+  }
+
+  private connectUpstream(forcePremium: boolean): void {
+    if (this.ended || this.client.ended) return;
+
+    this.upstreamReady = false;
+    this.upstreamDisconnectReason = null;
+    this.pending.clientConfiguration.length = 0;
+
+    const upstreamConfig: ClientOptions = {
+      host: this.remoteHost,
+      port: this.remotePort,
+      username: this.client.username,
+      version: this.client.version,
+      fakeHost: this.remoteHost,
+      keepAlive: false,
+      hideErrors: true,
+      connect: (candidate: McClient) => {
+        const socket = connect({
+          host: this.remoteHost,
+          port: this.remotePort,
+          family: 4,
+        });
+        (candidate as unknown as { setSocket: (value: Socket) => void }).setSocket(
+          socket,
+        );
+      },
+    } as ClientOptions;
+
+    const upstream = forcePremium
+      ? createClient({
+          ...upstreamConfig,
+          auth: 'microsoft',
+          profilesFolder: encryptedAuthCache as unknown as string,
+          onMsaCode: (code: {
+            user_code?: string;
+            verification_uri?: string;
+            expires_in?: number;
+          }) => this.emit('auth-code', code),
+        })
+      : createClient({ ...upstreamConfig, auth: 'offline' });
+
+    this.makeUpstreamPassiveAfterLogin(upstream);
+    this.upstream = upstream;
+
+    try {
+      upstream.socket?.setNoDelay(true);
+    } catch {}
+
+    let abandoned = false;
+    let connectTimeout: NodeJS.Timeout | undefined;
+    this.cleanup.push(() => clearTimeout(connectTimeout));
+
+    const abandon = (reason: string): void => {
+      if (abandoned) return;
+      abandoned = true;
+      clearTimeout(connectTimeout);
+      if (this.upstream === upstream) this.upstream = null;
+      try {
+        upstream.end(reason);
+      } catch {}
+    };
+
+    if (!forcePremium) {
+      upstream.once('encryption_begin', () => {
+        if (abandoned || this.ended || upstream !== this.upstream) return;
+        abandon('Switching to premium authentication');
+        this.connectUpstream(true);
+      });
+    }
+
+    upstream.once('connect', () => {
+      connectTimeout = setTimeout(() => {
+        if (abandoned || this.ended || upstream !== this.upstream) return;
+        this.upstreamDisconnectReason = 'Upstream connection timed out';
+        upstream.end(this.upstreamDisconnectReason);
+      }, 15_000);
+    });
+
+    upstream.on('state', (state: string) => {
+      if (
+        abandoned ||
+        upstream !== this.upstream ||
+        (state !== states.CONFIGURATION && state !== states.PLAY)
+      ) {
+        return;
+      }
+
+      if (!this.observedUpstreams.has(upstream)) {
+        this.observePackets(upstream, 'clientbound');
+        this.observedUpstreams.add(upstream);
+      }
+      if (state === states.CONFIGURATION) {
+        this.flush('serverConfiguration', upstream);
+      }
+    });
+
+    upstream.on('playerJoin', () => {
+      if (abandoned || upstream !== this.upstream) return;
+      clearTimeout(connectTimeout);
+      this.retryAttempt = 0;
+      this.upstreamReady = true;
+      this.flush('serverPlay', upstream);
+      if (forcePremium) this.emit('auth-success');
+      this.emit('upstream-ready');
+    });
+
+    upstream.on('disconnect', (packet: { reason?: unknown }) => {
+      if (abandoned || upstream !== this.upstream) return;
+      this.upstreamDisconnectReason =
+        packet.reason === undefined ? null : parseChatToPlain(packet.reason);
+    });
+
+    upstream.on('error', (error: Error) => {
+      void (async () => {
+        if (abandoned || this.ended || upstream !== this.upstream) return;
+
+        // Raw forwarding has already happened. A play decoder error belongs to
+        // the optional observer and must not terminate a healthy transport.
+        if (this.upstreamReady) {
+          this.emit('packet-error', error);
+          return;
+        }
+
+        if (isRetryableError(error) && this.retryAttempt < 4) {
+          this.retryAttempt++;
+          abandon('Retrying upstream connection');
+          await new Promise((resolve) =>
+            setTimeout(resolve, 800 * 2 ** this.retryAttempt),
+          );
+          this.connectUpstream(forcePremium);
+          return;
+        }
+
+        this.upstreamDisconnectReason = `Upstream error: ${error.message}`;
+        upstream.end(this.upstreamDisconnectReason);
+      })();
+    });
+
+    upstream.on('end', () => {
+      clearTimeout(connectTimeout);
+      if (abandoned || this.ended || upstream !== this.upstream) return;
+
+      const reason =
+        this.upstreamDisconnectReason ||
+        (this.upstreamReady
+          ? 'Upstream closed the connection'
+          : 'Upstream closed the connection before login completed');
+      if (forcePremium && !this.upstreamReady) this.emit('auth-error', reason);
+      this.close(reason);
+    });
+  }
+
+  private makeUpstreamPassiveAfterLogin(upstream: McClient): void {
+    const originalWrite = upstream.write.bind(upstream);
+    upstream.write = (name, data) => {
+      const isLoginPacket =
+        upstream.state === states.HANDSHAKING || upstream.state === states.LOGIN;
+      if (isLoginPacket) originalWrite(name, data);
+    };
+  }
+
+  private observePackets(endpoint: McClient, direction: PacketDirection): void {
+    const internals = endpoint as PacketEndpoint;
+    const packetStream = internals.decompressor ?? internals.splitter;
+    const onRawPacket = (buffer: Buffer): void => {
+      if (direction === 'clientbound' && endpoint !== this.upstream) return;
+      const state = endpoint.state;
+
+      // Forward first. Everything below this line is optional observation.
+      if (direction === 'serverbound') {
+        this.routeServerbound(state, buffer);
+      } else {
+        this.routeClientbound(state, buffer);
+      }
+
+      this.decodePacket(internals, direction, state, buffer);
+    };
+
+    packetStream.prependListener('data', onRawPacket);
+    this.cleanup.push(() => packetStream.off('data', onRawPacket));
+  }
+
+  private decodePacket(
+    endpoint: PacketEndpoint,
+    direction: PacketDirection,
+    state: string,
+    buffer: Buffer,
+  ): void {
+    try {
+      const parsed = endpoint.deserializer.parsePacketBuffer(buffer);
+      if (parsed.metadata.size !== buffer.length) {
+        this.emit(
+          'packet-error',
+          new Error(`Decoded ${parsed.metadata.size} of ${buffer.length} packet bytes`),
+        );
+        return;
+      }
+
+      const event: DecodedPacketEvent = {
+        direction,
+        state,
+        name: parsed.data.name,
+        data: parsed.data.params,
+      };
+      this.handleDecodedPacket(event);
+      this.emit('packet', event);
+    } catch (error) {
+      this.emit('packet-error', error);
+    }
+  }
+
+  private routeServerbound(state: string, buffer: Buffer): void {
+    const upstream = this.upstream;
+    if (state === states.CONFIGURATION) {
+      if (upstream?.state === states.CONFIGURATION || upstream?.state === states.PLAY) {
+        this.writeRaw(upstream, buffer);
+      } else {
+        this.pending.serverConfiguration.push(buffer);
+      }
+      return;
+    }
+
+    if (state !== states.PLAY) return;
+    const canReceivePlay = upstream?.state === states.PLAY;
+    const isReconfigurationAcknowledgement =
+      this.awaitingConfigurationAcknowledgement &&
+      upstream?.state === states.CONFIGURATION;
+    if (upstream && (canReceivePlay || isReconfigurationAcknowledgement)) {
+      this.writeRaw(upstream, buffer);
+    } else {
+      this.pending.serverPlay.push(buffer);
+    }
+  }
+
+  private routeClientbound(state: string, buffer: Buffer): void {
+    if (state === states.CONFIGURATION) {
+      this.pending.clientConfiguration.push(buffer);
+      if (this.configurationReady) {
+        this.flush('clientConfiguration', this.client);
+      }
+      return;
+    }
+
+    if (state !== states.PLAY) return;
+    if (this.client.state === states.PLAY) {
+      this.writeRaw(this.client, buffer);
+    } else {
+      this.pending.clientPlay.push(buffer);
+    }
+  }
+
+  private handleDecodedPacket(event: DecodedPacketEvent): void {
+    if (
+      event.direction === 'clientbound' &&
+      event.state === states.PLAY &&
+      event.name === 'start_configuration' &&
+      this.client.state === states.PLAY
+    ) {
+      this.awaitingConfigurationAcknowledgement = true;
+      return;
+    }
+
+    if (
+      event.direction === 'serverbound' &&
+      event.state === states.PLAY &&
+      event.name === 'configuration_acknowledged' &&
+      this.awaitingConfigurationAcknowledgement
+    ) {
+      this.awaitingConfigurationAcknowledgement = false;
+      this.client.state = states.CONFIGURATION;
+      return;
+    }
+
+    if (
+      event.direction === 'serverbound' &&
+      event.state === states.CONFIGURATION &&
+      event.name === 'finish_configuration'
+    ) {
+      this.client.state = states.PLAY;
+      this.flush('clientPlay', this.client);
+    }
+  }
+
+  private flush(queue: PendingQueue, destination: McClient): void {
+    for (const buffer of this.pending[queue].splice(0)) {
+      this.writeRaw(destination, buffer);
+    }
+  }
+
+  private writeRaw(destination: McClient, buffer: Buffer): void {
+    if (destination.ended) return;
+    try {
+      destination.writeRaw(buffer);
+    } catch {}
+  }
+}
+
 export class BedwarsProxy extends EventEmitter {
   private readonly network: ProxyNetwork;
   private readonly remoteHost: string;
@@ -99,6 +508,7 @@ export class BedwarsProxy extends EventEmitter {
   private localPort: number;
   private bindHost: ProxyBindHost;
   private server: McServer | null = null;
+  private connections = new Set<ProxyConnection>();
   private sessions = new Map<string, string>();
   private teamColors = new Map<string, string>();
   private teamPlayers = new Map<string, Set<string>>();
@@ -172,6 +582,11 @@ export class BedwarsProxy extends EventEmitter {
     this.gameActive = false;
   }
 
+  private closeConnections(reason: string): void {
+    for (const connection of [...this.connections]) connection.close(reason);
+    this.connections.clear();
+  }
+
   private addKnownPlayer(username: string): void {
     if (!username || username === '§r') return;
     const plain = stripColorCodes(username);
@@ -204,7 +619,12 @@ export class BedwarsProxy extends EventEmitter {
         motd: `Kyra | ${this.network === 'pikanetwork' ? 'PikaNetwork' : 'JartexNetwork'}`,
         maxPlayers: 5,
         keepAlive: false,
-        hideErrors: false,
+        hideErrors: true,
+        errorHandler: (client: McClient, error: unknown) => {
+          if (client.ended) return;
+          const message = error instanceof Error ? error.message : String(error);
+          (client as unknown as { _end: (reason: string) => void })._end(message);
+        },
         beforePing: (
           response: PingResponse,
           _client: unknown,
@@ -287,6 +707,7 @@ export class BedwarsProxy extends EventEmitter {
       server.on('error', (error: Error) => {
         this.lastError = error.message;
         this.server = null;
+        this.closeConnections('Proxy server stopped');
         this.sessions.clear();
         this.clearSessionState();
         this.emitProxyEvent({
@@ -302,102 +723,77 @@ export class BedwarsProxy extends EventEmitter {
         try {
           client.socket?.setNoDelay(true);
         } catch {}
+
         const username = client.username;
-        const sessionKey = `${username}_${Date.now()}`;
-        const clientVersion = client.version;
+        const sessionKey = `${username}_${Date.now()}_${this.connections.size}`;
+        const connection = new ProxyConnection({
+          server,
+          client,
+          remoteHost: this.remoteHost,
+          remotePort: this.remotePort,
+        });
+
         this.sessions.set(sessionKey, username);
+        this.connections.add(connection);
         this.emitProxyEvent({
           type: 'client-connect',
           network: this.network,
           clientName: username,
         });
-        let upstreamReady = false;
-        let sessionEnded = false;
-        let attempt = 0;
-        let activeUpstream: McClient | null = null;
-        const pendingClientBuffers: Buffer[] = [];
-        const pendingUpstreamBuffers: Buffer[] = [];
-        const pendingConfigurationBuffers: Buffer[] = [];
-        let configurationReady = false;
-        let awaitingConfigurationAcknowledgement = false;
-        const flushConfiguration = (): void => {
-          if (!configurationReady) return;
-          for (const buffer of pendingConfigurationBuffers.splice(0)) {
-            if (!client.ended) {
-              try {
-                client.writeRaw(buffer);
-              } catch {}
-            }
-          }
-        };
-        client.on('proxy-configuration-ready', () => {
-          configurationReady = true;
-          flushConfiguration();
-        });
-        const flushUpstreamBuffers = (joinedClient: McClient): void => {
-          if (joinedClient !== client) return;
-          for (const buffer of pendingUpstreamBuffers.splice(0)) {
-            if (!client.ended) {
-              try {
-                client.writeRaw(buffer);
-              } catch {}
-            }
-          }
-          server.off('playerJoin', flushUpstreamBuffers);
-        };
-        const enterConfigurationState = (): void => {
-          awaitingConfigurationAcknowledgement = true;
-          client.once('configuration_acknowledged', () => {
-            awaitingConfigurationAcknowledgement = false;
-            client.state = states.CONFIGURATION;
-            client.once('finish_configuration', () => {
-              client.state = states.PLAY;
-              flushUpstreamBuffers(client);
+
+        connection.on(
+          'auth-code',
+          (code: {
+            user_code?: string;
+            verification_uri?: string;
+            expires_in?: number;
+          }) => {
+            this.emitProxyEvent({
+              type: 'auth-code',
+              network: this.network,
+              userCode: code.user_code ?? '',
+              verificationUri: code.verification_uri ?? 'https://microsoft.com/link',
+              expiresInSeconds: code.expires_in ?? 900,
             });
+          },
+        );
+        connection.on('auth-success', () => {
+          this.emitProxyEvent({ type: 'auth-success', network: this.network });
+        });
+        connection.on('auth-error', (message: string) => {
+          this.emitProxyEvent({
+            type: 'auth-error',
+            network: this.network,
+            message: message || 'Sign-in failed. Please try again.',
           });
-        };
-        server.on('playerJoin', flushUpstreamBuffers);
-        const flushPendingClientBuffers = (): void => {
-          if (!upstreamReady || !activeUpstream || pendingClientBuffers.length === 0)
-            return;
-          for (const buffered of pendingClientBuffers) {
-            if (!activeUpstream.ended) {
-              try {
-                activeUpstream.writeRaw(buffered);
-              } catch {}
-            }
-          }
-          pendingClientBuffers.length = 0;
-        };
-        const relayClientBuffer = (buffer: Buffer): void => {
-          if (
-            client.state !== states.PLAY ||
-            awaitingConfigurationAcknowledgement ||
-            !activeUpstream
-          )
-            return;
-          if (!upstreamReady) {
-            pendingClientBuffers.push(buffer);
+        });
+        connection.on('upstream-ready', () => {
+          this.clearSessionState();
+          this.emitProxyEvent({
+            type: 'teams-update',
+            network: this.network,
+            teams: [],
+          });
+        });
+        connection.on('packet', (event: DecodedPacketEvent) => {
+          if (event.direction !== 'clientbound' || event.state !== states.PLAY) {
             return;
           }
-          if (!activeUpstream.ended) {
-            try {
-              activeUpstream.writeRaw(buffer);
-            } catch {}
+          if (event.name === 'player_info' || event.name === 'playerlist_item') {
+            this.handlePlayerInfoPacket(event.data);
+            return;
           }
-        };
-        const clientInternals = client as unknown as {
-          decompressor?: NodeJS.EventEmitter;
-          splitter: NodeJS.EventEmitter;
-        };
-        const clientPacketStream =
-          clientInternals.decompressor ?? clientInternals.splitter;
-        clientPacketStream.prependListener('data', relayClientBuffer);
-        const teardown = (): void => {
-          if (sessionEnded) return;
-          sessionEnded = true;
-          clientPacketStream.off('data', relayClientBuffer);
-          server.off('playerJoin', flushUpstreamBuffers);
+          if (event.name === 'player_remove') {
+            this.handlePlayerRemovePacket(event.data);
+            return;
+          }
+          if (event.name === 'teams' || event.name === 'scoreboard_team') {
+            this.handleTeamPacket(event.data);
+            this.checkGameState();
+          }
+        });
+        connection.once('close', () => {
+          this.connections.delete(connection);
           this.sessions.delete(sessionKey);
           this.emitProxyEvent({
             type: 'client-disconnect',
@@ -412,272 +808,9 @@ export class BedwarsProxy extends EventEmitter {
               teams: [],
             });
           }
-          if (activeUpstream && !activeUpstream.ended) {
-            try {
-              activeUpstream.end('Proxy session ended');
-            } catch {}
-          }
-          if (!client.ended) {
-            try {
-              client.end('Disconnected');
-            } catch {}
-          }
-        };
-        const connectUpstream = async (forcePremium: boolean): Promise<void> => {
-          if (sessionEnded || client.ended) return;
-          const upstreamConfig: ClientOptions = {
-            host: this.remoteHost,
-            port: this.remotePort,
-            username,
-            version: clientVersion,
-            hideErrors: false,
-            connect: (c: McClient) => {
-              const socket = connect({
-                host: this.remoteHost,
-                port: this.remotePort,
-                family: 4,
-              });
-              (c as unknown as { setSocket: (s: Socket) => void }).setSocket(socket);
-            },
-          } as ClientOptions;
-          const upstream = forcePremium
-            ? createClient({
-                ...upstreamConfig,
-                auth: 'microsoft',
-                profilesFolder: encryptedAuthCache as unknown as string,
-                onMsaCode: (code: {
-                  user_code?: string;
-                  verification_uri?: string;
-                  expires_in?: number;
-                }) => {
-                  this.emitProxyEvent({
-                    type: 'auth-code',
-                    network: this.network,
-                    userCode: code?.user_code ?? '',
-                    verificationUri:
-                      code?.verification_uri ?? 'https://microsoft.com/link',
-                    expiresInSeconds: code?.expires_in ?? 900,
-                  });
-                },
-              })
-            : createClient({
-                ...upstreamConfig,
-                auth: 'offline',
-              });
-          try {
-            upstream.socket?.setNoDelay(true);
-          } catch {}
-          activeUpstream = upstream;
-          let abandoned = false;
-          if (!forcePremium) {
-            (upstream as NodeJS.EventEmitter).once('encryption_begin', () => {
-              if (abandoned || sessionEnded || client.ended) return;
-              abandoned = true;
-              try {
-                (upstream as unknown as { socket?: Socket }).socket?.destroy();
-              } catch {}
-              try {
-                upstream.end('Switching to premium auth');
-              } catch {}
-              void connectUpstream(true);
-            });
-          }
-          let connectTimeout: NodeJS.Timeout | undefined;
-          upstream.once('connect', () => {
-            connectTimeout = setTimeout(() => {
-              if (!upstreamReady && !sessionEnded && upstream === activeUpstream) {
-                if (!upstream.ended) {
-                  try {
-                    upstream.end('Upstream connection timed out');
-                  } catch {}
-                }
-                if (!client.ended) {
-                  try {
-                    client.end('Upstream connection timed out');
-                  } catch {}
-                }
-                teardown();
-              }
-            }, 15_000);
-          });
-          let upstreamPacketStream: NodeJS.EventEmitter | null = null;
-          const relayUpstreamBuffer = (buffer: Buffer): void => {
-            if (upstream !== activeUpstream) return;
-            if (upstream.state === states.CONFIGURATION) {
-              pendingConfigurationBuffers.push(buffer);
-              flushConfiguration();
-            }
-            if (upstream.state !== states.PLAY) return;
-            if (!client.ended && client.state === states.PLAY) {
-              try {
-                client.writeRaw(buffer);
-              } catch {}
-            } else {
-              pendingUpstreamBuffers.push(buffer);
-            }
-          };
-          (upstream as NodeJS.EventEmitter).on('state', (state: string) => {
-            if (
-              upstreamPacketStream ||
-              (state !== states.CONFIGURATION && state !== states.PLAY)
-            )
-              return;
-            const internals = upstream as unknown as {
-              decompressor?: NodeJS.EventEmitter;
-              splitter: NodeJS.EventEmitter;
-            };
-            upstreamPacketStream = internals.decompressor ?? internals.splitter;
-            upstreamPacketStream.prependListener('data', relayUpstreamBuffer);
-          });
-          (upstream as NodeJS.EventEmitter).on(
-            'packet',
-            (data: Record<string, unknown>, meta: McPacketMeta) => {
-              if (upstream !== activeUpstream) return;
-              if (meta.state === states.CONFIGURATION) return;
-              if (meta.state !== states.PLAY) return;
-              if (meta.name === 'start_configuration') {
-                enterConfigurationState();
-                return;
-              }
-              if (meta.name === 'login') {
-                upstreamReady = true;
-                clearTimeout(connectTimeout);
-                flushPendingClientBuffers();
-                this.clearSessionState();
-                if (forcePremium) {
-                  this.emitProxyEvent({ type: 'auth-success', network: this.network });
-                }
-                this.emitProxyEvent({
-                  type: 'teams-update',
-                  network: this.network,
-                  teams: [],
-                });
-                return;
-              }
-              if (meta.name === 'player_info' || meta.name === 'playerlist_item') {
-                this.handlePlayerInfoPacket(data);
-                return;
-              }
-              if (meta.name === 'player_remove') {
-                this.handlePlayerRemovePacket(data);
-                return;
-              }
-              if (meta.name === 'teams' || meta.name === 'scoreboard_team') {
-                this.handleTeamPacket(data);
-                this.checkGameState();
-              }
-            },
-          );
-          (upstream as NodeJS.EventEmitter).on(
-            'disconnect',
-            (data: { reason?: string }) => {
-              clearTimeout(connectTimeout);
-              if (abandoned || upstream !== activeUpstream) return;
-              if (!upstreamReady && !sessionEnded) {
-                const text =
-                  data.reason !== undefined ? parseChatToPlain(data.reason) : '';
-                if (forcePremium) {
-                  this.emitProxyEvent({
-                    type: 'auth-error',
-                    network: this.network,
-                    message: text || 'Sign-in failed. Please try again.',
-                  });
-                }
-                if (!client.ended) {
-                  try {
-                    client.end(text || 'Disconnected by upstream server');
-                  } catch {}
-                }
-              }
-              teardown();
-            },
-          );
-          (upstream as NodeJS.EventEmitter).on('error', (error: Error) => {
-            void (async () => {
-              clearTimeout(connectTimeout);
-              if (abandoned || upstream !== activeUpstream) return;
-              if (
-                upstreamReady &&
-                error.message.startsWith('Parse error for play.toClient:')
-              )
-                return;
-              if (
-                !upstreamReady &&
-                isRetryableError(error) &&
-                attempt < 4 &&
-                !sessionEnded &&
-                !client.ended
-              ) {
-                attempt++;
-                await new Promise((r) => setTimeout(r, 800 * 2 ** attempt));
-                await connectUpstream(forcePremium);
-                return;
-              }
-              if (!upstreamReady && !sessionEnded) {
-                if (forcePremium) {
-                  this.emitProxyEvent({
-                    type: 'auth-error',
-                    network: this.network,
-                    message: error?.message ?? 'Sign-in failed. Please try again.',
-                  });
-                }
-                if (!client.ended) {
-                  try {
-                    client.end(`Upstream error: ${error?.message ?? 'unknown'}`);
-                  } catch {}
-                }
-              }
-              teardown();
-            })();
-          });
-          (upstream as NodeJS.EventEmitter).on('end', () => {
-            clearTimeout(connectTimeout);
-            if (abandoned || upstream !== activeUpstream) return;
-            if (!upstreamReady && !sessionEnded) {
-              if (forcePremium) {
-                this.emitProxyEvent({
-                  type: 'auth-error',
-                  network: this.network,
-                  message: 'Sign-in failed. Please try again.',
-                });
-              }
-              if (!client.ended) {
-                try {
-                  client.end('Upstream closed the connection before login completed');
-                } catch {}
-              }
-            }
-            teardown();
-          });
-        };
-        void connectUpstream(false);
-        (client as NodeJS.EventEmitter).on(
-          'packet',
-          (
-            _data: Record<string, unknown>,
-            meta: McPacketMeta,
-            _buffer: Buffer,
-            fullBuffer: Buffer,
-          ) => {
-            if (!activeUpstream) return;
-            if (meta.state === states.CONFIGURATION) {
-              if (
-                meta.name !== 'finish_configuration' &&
-                meta.name !== 'select_known_packs' &&
-                meta.name !== 'accept_code_of_conduct' &&
-                activeUpstream.state === states.CONFIGURATION &&
-                !activeUpstream.ended
-              ) {
-                try {
-                  activeUpstream.writeRaw(fullBuffer);
-                } catch {}
-              }
-            }
-          },
-        );
-        (client as NodeJS.EventEmitter).on('end', () => {
-          teardown();
         });
+
+        connection.start();
       });
     });
   }
@@ -790,6 +923,7 @@ export class BedwarsProxy extends EventEmitter {
 
   async stop(): Promise<void> {
     if (!this.server) return;
+    this.closeConnections('Proxy stopped');
     this.server.close();
     this.server = null;
     this.lastError = null;
