@@ -21,6 +21,7 @@ let topmostTimer: NodeJS.Timeout | null = null;
 let lastCursorX = -1;
 let lastCursorY = -1;
 let ignoringMouseEvents = false;
+let windowAlwaysOnTop = false;
 
 const topmostReassertIntervalMs = 1500;
 const topmostLevel = process.platform === 'darwin' ? 'floating' : 'screen-saver';
@@ -64,6 +65,7 @@ function stopTopmostReassert(): void {
 }
 
 export function setWindowAlwaysOnTop(enabled: boolean): void {
+  windowAlwaysOnTop = enabled;
   const win = mainWindow;
   if (!win || win.isDestroyed()) return;
 
@@ -118,7 +120,7 @@ export function createWindow(): BrowserWindow {
   }
 
   win.on('focus', () => {
-    if (ignoringMouseEvents) {
+    if (ignoringMouseEvents && windowAlwaysOnTop) {
       win.blur();
     }
   });
