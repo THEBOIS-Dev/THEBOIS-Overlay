@@ -63,6 +63,20 @@ function stopTopmostReassert(): void {
   topmostTimer = null;
 }
 
+export function setWindowAlwaysOnTop(enabled: boolean): void {
+  const win = mainWindow;
+  if (!win || win.isDestroyed()) return;
+
+  if (!enabled) {
+    stopTopmostReassert();
+    win.setAlwaysOnTop(false);
+    return;
+  }
+
+  reassertAlwaysOnTop(win);
+  startTopmostReassert(win);
+}
+
 export function createWindow(): BrowserWindow {
   const state = windowStateKeeper({
     defaultWidth: width,
@@ -80,7 +94,7 @@ export function createWindow(): BrowserWindow {
     minHeight,
     frame: false,
     transparent: true,
-    alwaysOnTop: true,
+    alwaysOnTop: false,
     hasShadow: false,
     maximizable: false,
     fullscreenable: false,
@@ -98,8 +112,6 @@ export function createWindow(): BrowserWindow {
 
   mainWindow = win;
   state.manage(win);
-  win.setAlwaysOnTop(true, topmostLevel);
-  startTopmostReassert(win);
 
   if (process.platform === 'win32') {
     win.setSkipTaskbar(false);
